@@ -1,3 +1,4 @@
+// NOTE: copy of the first prototype solver, with one fix (a 1e-9 tolerance on the dynamic-move flag) so parity tests are not thrown off by float noise.
 /*
  * physicsSolver.js - Phase 1 route search for the Climb Beta Planner.
  *
@@ -165,7 +166,7 @@
           if (!bp) continue;
           if (!transitionOK(n.bp, bp, n.s, s, limb, holds, body, strainLimit)) continue;
           const strainTerm = 0.6 * Math.max(0, bp.strain - 0.6) ** 2 * 6;
-          const dynamic = bp.strain > 1.0;
+          const dynamic = bp.strain > 1.0 + 1e-9; // tolerance for float noise at the reach edge
           const g = n.g + 1 + strainTerm + (dynamic ? 1.5 : 0) + balanceCost(bp, s) + (limb < 2 ? handCost(limb, hi) : 0);
           const k = key(s);
           if (best.has(k) && best.get(k) <= g) continue;

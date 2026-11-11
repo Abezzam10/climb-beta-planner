@@ -1,22 +1,32 @@
-# Climb Beta Planner (Phase 1 MVP preview)
+# Climb Move Helper (early test version)
 
-A static, browser-only tool that suggests a hand and foot sequence up a wall, from your height and wingspan plus holds you mark on a photo (or a built-in sample wall). Open `index.html` (or run `python3 -m http.server` here) - no build step, no backend, no paid services. No CDN or network needed.
+A browser tool that suggests which hand or foot to move next, one move at a time, from your height and arm span plus holds you mark on a wall photo (or a built-in sample wall). The solver is written in Python (`physics_solver.py`) and runs in your browser through Pyodide. No backend, no paid services. Your photo is not uploaded anywhere.
 
-## Honest scope
-- 2D heuristic search (A*) in `physicsSolver.js`. It is not validated biomechanics.
-- It cannot see wall angle, depth, hold quality, friction or your strength. Weight is collected but not used in scoring.
-- Hold types and sizes are marked by you (sample wall: 25 pre-set holds). The ground is wherever you set the ground line. Nothing is detected automatically yet.
-- "Dynamic" means a reach slightly past the static limit, flagged and unverified.
-- Output is a suggestion to try, not a claim of best, optimal or safe.
-- Tested with a synthetic photo (see tests/e2e.mjs), not a real gym photo set. Mac/Ollama speed is unmeasured.
+## What it is and is not
+- A simple flat (2D) reach-and-balance search. It is not validated biomechanics.
+- It cannot see wall angle, depth, hold shape, friction or your strength. Weight is not asked for or used.
+- Conservative stance rules: a pose is rejected if a foot hold is higher than the hips, or if hands or feet cross left to right. This also rules out some real moves.
+- Hold types come from you (sample wall: 25 preset holds). Nothing is detected automatically yet.
+- The picture is an illustration of one suggested move, not a body simulation. It is a guess, not a claim that a route is best, possible or safe.
 
 ## Files
-`index.html`, `styles.css`, `app.js` (UI), `physicsSolver.js` (pure solver, no DOM), `sampleWall.js`, `tests/solver.test.js` (`node tests/solver.test.js`), `tests/e2e.mjs` (Chrome click-through at phone size: `node tests/e2e.mjs http://localhost:8000 /tmp`).
+- `physics_solver.py` - the solver (standard library only). Source of truth.
+- `src/` - page sources (`index.html`, `app.js`, `styles.css`, `solver_worker.js`, `sampleWall.js`). `python3 src/build_single.py` writes the single `index.html` that is served. Run it after changing any of these or the solver.
+- `vendor/pyodide/` - the Pyodide 314.0.7 core runtime (about 12 MB), served from this site so no CDN is used. Unmodified official release files. Licenses for it and the components inside it are in `vendor/pyodide/licenses/` and mapped in `vendor/pyodide/NOTICE.txt`.
+- `tests/` - `test_parity.py` (needs Node; compares with the first JavaScript prototype in `tests/legacy/`, with the new stance rules switched off), `evaluate.py` (fixed tune and validation walls with an independent route check), `e2e.mjs` (headless Chrome click-through).
+- `RUNBOOK.md` - plan for offline solver experiments. Not built and not run.
 
-## Hosting on GitHub Pages
-This repo is served straight from the `main` branch (Settings > Pages > Deploy from a branch > `main` / root). No build step or workflow is needed. Tests are run by hand with `node tests/solver.test.js`.
+## Run it
+`python3 -m http.server` in this folder, then open http://localhost:8000. It must be served over http (not opened as a file) so the Python runtime can load. The first load takes a few seconds and downloads about 12 MB from the same site.
 
-## Phase 2 idea (research, not built)
-[Dream-RSI](https://www.dream-rsi.com/) (project page; citation on the page is still a placeholder) improves the *exploration policy* of a coding agent running long discovery loops, by replaying recorded search trees as a cheap simulator. It is not a photo-to-route model. A possible adaptation: a local coding model (e.g. via Ollama) proposes variants of `physicsSolver.js`, scored offline on a fixed benchmark of walls. Needed first: a benchmark with ground-truth routes, held-out walls, and checks against shortcut gains (e.g. scoring well by making the model too permissive). Local model quality and speed on an 8GB/16GB M1 are untested.
+## Tests
+`python3 tests/test_parity.py`, `python3 tests/evaluate.py --split both`, `node tests/e2e.mjs http://localhost:8000 /tmp` (Chrome required).
 
-Phase 3 idea: hold detection from photos with a small open-source detector (see https://github.com/mkurc1/climbingcrux_model, MIT, for a YOLO-based approach with marker-based scale). Check dataset and model licences before use.
+## Hosting
+Served by GitHub Pages from the `main` branch root. No build runs on the server.
+
+## License
+No license has been chosen yet for this project's own code. The bundled Pyodide runtime keeps its own licenses (MPL-2.0 and others, see `vendor/pyodide/`).
+
+## Research idea (not built)
+[Dream-RSI](https://www.dream-rsi.com/) improves the exploration policy of a coding agent by replaying recorded search trees. Adapting that idea to this solver would need a fixed benchmark, held-out walls and checks against score shortcuts. See `RUNBOOK.md`. Nothing here claims it works.

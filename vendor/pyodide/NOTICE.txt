@@ -1,0 +1,18 @@
+Vendored Pyodide runtime, release 314.0.7 (core files only; no optional Pyodide packages).
+Files pyodide.mjs, pyodide.asm.mjs, pyodide.asm.wasm, python_stdlib.zip were compared byte for byte with the official release
+asset https://github.com/pyodide/pyodide/releases/download/314.0.7/pyodide-core-314.0.7.tar.bz2 and are identical.
+(That tarball ships no license files, so notices below come from the sources the build pins.)
+
+Components linked into pyodide.asm.wasm per the 314.0.7 build files (Makefile.envs and cpython/Makefile at tag 314.0.7), and the license file collected for each:
+ - Pyodide, hiwire (Pyodide's own repo, MPL-2.0): Pyodide-MPL-2.0.txt, hiwire-LICENSE.txt (hiwire at pinned commit 6a1e672)
+ - CPython 3.14.2 (PSF license): CPython-3.14.2-LICENSE.txt
+ - libmpdec and expat (bundled inside CPython): libmpdec-header-license.txt (from the file header, no separate file in 3.14.2), expat-COPYING.txt
+ - libffi (pinned commit f08493d): libffi-LICENSE.txt
+ - xz / liblzma 5.2.2: xz-5.2.2-COPYING.txt
+ - zstd 1.5.7: zstd-1.5.7-LICENSE.txt
+ - sqlite 3.39.0: sqlite-public-domain.txt
+ - zlib 1.3.1 (inflate banner found in the wasm) and bzip2 (Emscripten ports, -sUSE_ZLIB -sUSE_BZIP2): zlib-LICENSE.txt, bzip2-1.0.6-LICENSE.txt (bzip2 port version 1.0.6 confirmed from Emscripten 5.0.3 tools/ports/bzip2.py; license file from the emscripten-ports/bzip2 1.0.6 tag)
+ - Emscripten 5.0.3 (MIT / NCSA), its musl libc and libc++: Emscripten-5.0.3-LICENSE.txt, musl-COPYRIGHT.txt, libcxx-LICENSE.txt
+Emscripten 5.0.3 LLVM runtime libraries (Apache-2.0 with LLVM Exceptions, license files taken from the Emscripten 5.0.3 tag): libcxx-LICENSE.txt, LLVM-libcxxabi-LICENSE.txt, LLVM-libunwind-LICENSE.txt, LLVM-compiler-rt-LICENSE.txt.
+Limits: the exact list of Emscripten system libraries linked into the wasm was not read from the binary; the build files and the list above are the basis. Any other component found later should be added.
+Not legal advice. Pyodide MPL-2.0 (a file-level copyleft) applies to the files unmodified here; keep them unmodified.

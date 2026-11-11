@@ -3,105 +3,873 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Climb Beta Planner (MVP preview)</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Climb Move Helper (early test)</title>
+  <style>
+*{box-sizing:border-box}
+html{font-size:18px}
+body{margin:0;background:#12100e;color:#fafaf9;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.45;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding:14px 16px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:0}
+h1{font-size:1.2rem;margin:4px 0;white-space:nowrap}
+.tag{font-size:.68rem;white-space:nowrap;color:#fde68a;border:1px solid #57534e;border-radius:999px;padding:2px 9px}
+.big{font-size:1.15rem;margin:8px 0 14px}
+.card{background:#1c1917;border:1px solid #2e2a27;border-radius:16px;padding:14px;margin:0 0 14px}
+.card h2{font-size:1.05rem;margin:0 0 10px}
+.lbl{display:grid;gap:6px;font-size:.95rem;margin:0 0 12px}
+.hint{font-size:.8rem;color:#b5b0aa}
+.row{display:flex;gap:8px;align-items:center}
+.unit{color:#d6d3d1}
+.inp{background:#0c0a09;border:1px solid #57534e;border-radius:10px;padding:12px;color:#fafaf9;min-width:0;flex:1;font-size:16px}
+.inp.sm{flex:0 0 80px}
+.btn{background:#292524;border:1px solid #57534e;border-radius:12px;padding:12px 14px;font-size:1rem;color:#fafaf9;cursor:pointer;font-family:inherit}
+.btn:hover{background:#3a3532}
+.btn.primary{background:#ea580c;border-color:#ea580c;font-weight:600}.btn.primary:hover{background:#c2410c}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.inp:focus-visible,summary:focus-visible{outline:3px solid #fbbf24;outline-offset:2px}
+.big-btn{min-height:56px;font-size:1.1rem;display:flex;align-items:center;justify-content:center;text-align:center}
+.pick{cursor:pointer}
+.stack{display:grid;gap:10px;margin:0 0 12px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.more{margin:0 0 12px;color:#d6d3d1;font-size:.9rem}
+.more summary{cursor:pointer;padding:8px 0;color:#e7e5e4}
+.chk{display:flex;gap:8px;align-items:center;font-size:.9rem;margin:6px 0}
+.limits{padding-left:20px;margin:6px 0}
+.steps{display:flex;gap:6px;margin:4px 0 10px}
+.steps span{flex:1;height:6px;border-radius:3px;background:#3a3532}
+.steps span.done{background:#ea580c}.steps span.now{background:#fbbf24}
+.banner{background:#422006;border:1px solid #7c4a0b;color:#fff7ed;border-radius:14px;padding:12px 14px;font-size:1.05rem;margin:0 0 12px;min-height:3.2rem}
+.banner b{display:block;font-size:.8rem;color:#fde68a;font-weight:600;margin-bottom:2px}
+.kinds{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 8px}
+.kind i{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:8px;vertical-align:-2px}
+.kind.active{outline:3px solid #fbbf24;background:#3a3532}
+.canvas-wrap{max-width:420px;margin:0 auto 12px}
+canvas{width:100%;height:auto;display:block;background:#0c0a09;border-radius:14px;touch-action:manipulation}
+#wall{cursor:crosshair}
+.sticky{position:sticky;bottom:0;background:linear-gradient(transparent,#12100e 30%);padding-top:14px}
+.movehead{margin:4px 0 10px}
+.count{font-size:.85rem;color:#fde68a;font-weight:600}
+.movetitle{font-size:1.55rem;line-height:1.2;margin:2px 0 6px}
+.movesub{font-size:1rem;color:#d6d3d1;margin:0}
+.navbar{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;padding:4px 0 6px;margin:0 0 6px}
+.nav{min-height:60px;font-size:1.1rem;padding:8px 6px;white-space:nowrap}
+#s-moves .canvas-wrap{max-width:min(420px,max(240px,calc((100svh - 400px)*.6667)))}
+.warnline{background:#4a1d3a;border:1px solid #9d3a7a;border-radius:12px;padding:10px 12px;margin:0 0 10px}
+.safety{font-size:.85rem;color:#b5b0aa;margin:4px 0 10px}
+.foot{font-size:.75rem;color:#8a847e}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;font-size:.9rem}
+.stats .hint{display:block}
+table.moves{width:100%;font-size:.85rem;border-collapse:collapse}
+table.moves td,table.moves th{text-align:left;padding:5px 6px;border-bottom:1px solid #2e2a27}
+tr.cur{background:#2e2a27}
+.busy{position:fixed;inset:0;background:rgba(10,8,7,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9;text-align:center;padding:24px}
+.busy p{font-size:1.1rem;max-width:20rem}
+.spin{width:44px;height:44px;border:5px solid #44403c;border-top-color:#fb923c;border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+@media(min-width:700px){.wrap{max-width:640px}}
+</style>
 </head>
 <body>
-<header class="wrap">
-  <h1>Climb Beta Planner</h1>
-  <p class="lead">Suggest a sequence of hand and foot moves up a wall from a photo and your body size. A starting point to try, not a verdict.</p>
-  <div class="badges" id="roadmap">
-    <span class="badge badge-now">Phase 1: Reach and balance heuristic prototype (early, not validated)</span>
-    <span class="badge badge-next">Phase 2: Offline solver experiments inspired by Dream-RSI (research idea, not built)</span>
-  </div>
+<header class="wrap top">
+  <h1>Climb Move Helper</h1>
+  <span class="tag">Early test version</span>
 </header>
 
-<main class="wrap grid">
-  <section class="card" aria-labelledby="profile-h">
-    <h2 id="profile-h">Your climbing profile</h2>
-    <form id="profile" onsubmit="return false">
-      <label class="lbl">Height
-        <div class="row"><input id="height" type="number" step="any" value="175" class="inp"><select id="heightUnit" class="inp sm"><option>cm</option><option>in</option></select></div>
+<main class="wrap">
+  <!-- SCREEN 1: welcome -->
+  <section id="s-home" class="screen">
+    <p class="big">Pick a wall. I will tell you which hand or foot to move, one move at a time.</p>
+    <div class="card">
+      <h2>About you</h2>
+      <label class="lbl">Your height
+        <div class="row"><input id="height" type="number" inputmode="decimal" step="any" value="175" class="inp"><select id="heightUnit" class="inp sm" aria-label="Height unit"><option>cm</option><option>in</option></select></div>
       </label>
-      <label class="lbl">Wingspan (fingertip to fingertip)
-        <div class="row"><input id="span" type="number" step="any" value="178" class="inp"><select id="spanUnit" class="inp sm"><option>cm</option><option>in</option></select></div>
+      <label class="lbl">Arm span <span class="hint">(arms out wide, fingertip to fingertip)</span>
+        <div class="row"><input id="span" type="number" inputmode="decimal" step="any" value="178" class="inp"><select id="spanUnit" class="inp sm" aria-label="Arm span unit"><option>cm</option><option>in</option></select></div>
       </label>
-      <label class="lbl">Weight <span class="hint">(saved, not used in scoring)</span>
-        <div class="row"><input id="weight" type="number" step="any" value="70" class="inp"><select id="weightUnit" class="inp sm"><option>kg</option><option>lb</option></select></div>
-      </label>
-      <label class="lbl">Stronger hand
-        <select id="dominant" class="inp"><option value="right">Right</option><option value="left">Left</option><option value="either">Either / both</option></select>
-      </label>
-      <label class="lbl">Move style
-        <select id="style" class="inp">
-          <option value="static">Static: stay balanced, avoid big stretches</option>
-          <option value="dynamic">Dynamic: allow longer reaches (flagged)</option>
-        </select>
-      </label>
-    </form>
-    <p class="hint">Height and wingspan set how far each limb can reach in the model. Defaults: 175 cm and 178 cm. Weight is kept for later phases because weight alone does not tell us how hard a move is.</p>
+      <details class="more"><summary>More choices</summary>
+        <label class="lbl">Stronger hand
+          <select id="dominant" class="inp"><option value="right">Right</option><option value="left">Left</option><option value="either">Either</option></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="allowStretch"> Allow long stretches (they will be marked)</label>
+      </details>
+    </div>
+    <div class="stack">
+      <button id="loadSample" class="btn big-btn primary">Try the sample wall</button>
+      <label class="btn big-btn pick">Use my own wall photo<input id="photo" type="file" accept="image/*" hidden></label>
+    </div>
   </section>
 
-  <section class="card" aria-labelledby="wall-h">
-    <h2 id="wall-h">Wall</h2>
-    <div class="btns">
-      <button id="loadSample" class="btn btn-primary">Load sample wall (25 holds)</button>
-      <label class="btn pick">Upload wall photo<input id="photo" type="file" accept="image/*" hidden></label>
-      <button id="clearHolds" class="btn">Clear holds</button>
+  <!-- SCREEN 2: set up the wall -->
+  <section id="s-setup" class="screen" hidden>
+    <div class="steps" id="stepsBar" aria-hidden="true"></div>
+    <div class="banner" id="banner" aria-live="polite"></div>
+    <div id="sizeBox" class="card" hidden>
+      <label class="lbl">How long is the line you tapped?
+        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span><button id="setSize" class="btn primary">Set size</button></div>
+        <span class="hint">100 cm is 1 metre. A tape measure or a door works well.</span>
+      </label>
     </div>
-    <div id="tools" class="btns" role="group" aria-label="Marking tool">
-      <button data-mode="calibrate" class="btn tool">1. Calibrate scale</button>
-      <button data-mode="ground" class="btn tool">2. Set ground line</button>
-      <button data-mode="start" class="btn tool">Start hold</button>
-      <button data-mode="hand" class="btn tool">Hand hold</button>
-      <button data-mode="foot" class="btn tool">Foot hold</button>
-      <button data-mode="top" class="btn tool">Top hold</button>
-      <button data-mode="erase" class="btn tool">Erase</button>
+    <div id="floorBox" class="stack" hidden>
+      <button id="noGround" class="btn">I can't see the floor in my photo</button>
     </div>
-    <label class="hint"><input type="checkbox" id="noGround"> No ground visible in this photo (feet must start on holds I mark)</label>
-    <p id="status" class="status">Load the sample wall or upload a photo to begin.</p>
-    <div class="canvas-wrap"><canvas id="wall" width="600" height="900"></canvas></div>
-    <div class="legend" aria-label="Legend">
-      <span><i style="background:#22c55e"></i>start</span><span><i style="background:#ef4444"></i>top</span><span><i style="background:#38bdf8"></i>hand</span><span><i style="background:#fbbf24"></i>foot</span>
-      <span>Limbs: <b style="color:#38bdf8">LH</b> <b style="color:#a78bfa">RH</b> <b style="color:#fbbf24">LF</b> <b style="color:#fb923c">RF</b></span>
+    <div id="holdBox" hidden>
+      <div class="kinds" role="group" aria-label="What kind of hold">
+        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (2)</button>
+        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Hand holds</button>
+        <button class="btn kind" data-mode="foot"><i style="background:#fbbf24"></i>Foot holds</button>
+        <button class="btn kind" data-mode="top"><i style="background:#ef4444"></i>Finish (1)</button>
+      </div>
+      <div class="btns">
+        <button id="undo" class="btn">Undo last</button>
+        <button id="erase" class="btn kind" data-mode="erase">Remove a hold</button>
+      </div>
     </div>
-    <div class="btns stepbar">
-      <button id="solve" class="btn btn-primary">Find a sequence</button>
-      <button id="prev" class="btn" aria-label="Previous step">&larr;</button>
-      <button id="next" class="btn" aria-label="Next step">&rarr;</button>
-      <label>Step <input id="step" type="range" min="0" max="0" value="0"> <span id="stepLabel">0</span></label>
-    </div>
-    <p id="caption" class="caption"></p>
+    <div class="stack"><button id="solve" class="btn big-btn primary" hidden>Find my moves</button></div>
+    <div class="canvas-wrap"><canvas id="wall" width="600" height="900" aria-label="Wall photo"></canvas></div>
+    <div class="stack"><button id="startOver" class="btn">Start over</button></div>
   </section>
 
-  <section class="card wide" aria-labelledby="out-h">
-    <h2 id="out-h">Suggested sequence</h2>
-    <div id="result" class="muted">No sequence yet.</div>
+  <!-- SCREEN 3: moves -->
+  <section id="s-moves" class="screen" hidden>
+    <div class="movehead">
+      <div class="count" id="count"></div>
+      <h2 id="moveTitle" class="movetitle" aria-live="polite"></h2>
+      <p id="moveSub" class="movesub"></p>
+    </div>
+    <div class="canvas-wrap"><canvas id="wall2" width="600" height="900" aria-label="Wall with the suggested move"></canvas></div>
+    <p id="warnLine" class="warnline" hidden></p>
+    <div class="navbar">
+      <button id="prev" class="btn nav">&larr; Back</button>
+      <button id="replay" class="btn nav ghost">&#8635; Replay</button>
+      <button id="next" class="btn nav primary">Next &rarr;</button>
+    </div>
+    <p class="safety">Only a guess from a simple flat model. It is not checked for safety and cannot see the wall's angle or the holds. Use your own judgment.</p>
+    <details class="more"><summary>More details</summary>
+      <div id="details"></div>
+    </details>
+    <div class="stack"><button id="changeWall" class="btn">Change wall or my size</button></div>
   </section>
 
-  <section class="card wide" aria-labelledby="limits-h">
-    <h2 id="limits-h">What this does and does not know</h2>
+  <details class="more about"><summary>About this project</summary>
+    <p>An early test that turns a wall photo and a few holds you mark into a suggested order of hand and foot moves, using simple reach and balance rules. It does not say a route is best, safe, or possible. Planned later: automatic hold finding, and offline tests to improve the search on walls it was not tuned on.</p>
     <ul class="limits">
-      <li>It works in flat 2D. It cannot see wall angle, depth, hold shape, chalk, or friction in a photo.</li>
-      <li>"Reach" comes from rough body proportions: arm reach is about 39% of wingspan, leg reach about 50% of height. Real people vary a lot.</li>
-      <li>Each move must keep the hips within 30% of your height of the previous pose, and the three limbs that stay put must still be within reach halfway through. That is a simple 2D check, not real physics.</li>
-      <li>"Balance" is how far the hips drift sideways from the feet. It is not a real torque calculation.</li>
-      <li>"Dynamic" moves are reaches slightly past the static limit. They are flagged, not checked for safety.</li>
-      <li>The ground is only where you set the ground line. If you do not set one, feet must start on marked holds.</li>
-      <li>Hold types and sizes come from you, or from the sample wall. Nothing is detected automatically yet.</li>
-      <li>It does not know your strength or grade, and cannot say a move is possible, safe, or "optimal". Use your own judgment and climb with proper safety practices.</li>
+      <li>It works in flat 2D. It cannot see wall angle, depth, hold shape, chalk or grip.</li>
+      <li>Reach is a rough guess from your size: arm about 39% of arm span, leg about 50% of height.</li>
+      <li>"Balance" is only how far the hips drift sideways from the feet. It is not a real force calculation.</li>
+      <li>Hold types come from you (or the sample wall). Nothing is found automatically yet.</li>
+      <li>It does not know your strength or grade.</li>
     </ul>
-  </section>
-
-  <section class="card wide" aria-labelledby="why-h">
-    <h2 id="why-h">About this project</h2>
-    <p class="muted story">An experiment in turning a wall photo and a few marked holds into a suggested order of hand and foot moves, using simple reach and balance rules. It is an early prototype: it says plainly what it is guessing and does not claim a route is best, safe, or possible. Planned later work: automatic hold detection, and offline experiments to improve the search, tested on walls it was not tuned on.</p>
-  </section>
+  </details>
 </main>
-<footer class="wrap foot">Everything runs in your browser and works offline once loaded. Photos are not uploaded anywhere.</footer>
+<footer class="wrap foot">Everything runs in your browser. Your photo is not uploaded anywhere. The first time, a Python helper (about 12 MB) is loaded from this site.</footer>
 
-<script src="sampleWall.js"></script>
-<script src="physicsSolver.js"></script>
-<script src="app.js"></script>
+<div id="busy" class="busy" hidden><div class="spin"></div><p id="busyText">Working...</p></div>
+
+<script>
+/* Sample wall: a made-up 3 m x 4.5 m wall with 25 holds. Not a real gym. Units: cm, y up. */
+(function (root) {
+  const H = [
+    // [x, y, kind, size]
+    [120, 60, 'start', 3], [175, 70, 'start', 3],
+    [90, 25, 'foot', 2], [200, 30, 'foot', 2], [150, 45, 'foot', 2],
+    [105, 130, 'hand', 2], [190, 150, 'hand', 1], [140, 190, 'hand', 3],
+    [80, 100, 'foot', 2], [215, 105, 'foot', 2], [125, 115, 'foot', 1],
+    [210, 230, 'hand', 2], [100, 245, 'hand', 1], [165, 275, 'hand', 3],
+    [140, 150, 'foot', 2], [180, 205, 'foot', 2], [120, 215, 'foot', 1],
+    [95, 320, 'hand', 2], [205, 315, 'hand', 1], [150, 350, 'hand', 3],
+    [170, 260, 'foot', 2], [115, 290, 'foot', 2], [190, 335, 'foot', 1],
+    [130, 395, 'hand', 2], [160, 430, 'top', 3],
+  ];
+  const holds = H.map((h, i) => ({ id: 'H' + (i + 1), x: h[0], y: h[1], kind: h[2], size: h[3] }));
+  root.SAMPLE_WALL = { widthCm: 300, heightCm: 450, holds };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script id="py-src" type="text/plain">"""physics_solver.py - Python source of truth for the Climb Beta Planner solver.
+
+Same model as the JavaScript prototype: a 2D heuristic search (A*) over limb
+placements. It is NOT validated biomechanics. Weight is not used. Coordinates are
+centimetres, x right, y UP. Limbs: 0=LH 1=RH 2=LF 3=RF.
+
+Pure standard library (no numpy), so it also runs in the browser through Pyodide.
+Input and output are plain dicts so they can cross a JSON boundary.
+"""
+import math
+import time
+
+LIMB_NAMES = ["LH", "RH", "LF", "RF"]
+MAX_HIP_SHIFT = 0.30  # fraction of height
+# Conservative stance rules added after the JS prototype (set both False to match the JS solver exactly):
+FEET_BELOW_HIPS = True  # a pose is rejected if a foot hold is higher than the hips
+NO_CROSSING = True      # a pose is rejected if the left hand is right of the right hand, or the left foot right of the right foot
+
+
+def body_from_profile(p):
+    h, w = p["heightCm"], p["wingspanCm"]
+    return {
+        "height": h,
+        "armReach": 0.39 * w,
+        "legReach": 0.50 * h,
+        "shoulderUp": 0.29 * h,
+        "idealHipAboveFeet": 0.45 * h,
+    }
+
+
+def place_body(limbs, X, Y, body, strain_limit):
+    """Find a hip position keeping all limbs within reach. Returns (x, y, strain) or None.
+    X and Y are the hold coordinate lists; limbs are 4 hold indices."""
+    i0, i1, i2, i3 = limbs
+    if NO_CROSSING and (X[i0] > X[i1] or X[i2] > X[i3]):
+        return None
+    x = 0.25 * (X[i0] + X[i1]) + 0.25 * (X[i2] + X[i3])
+    arm = body["armReach"]
+    leg = body["legReach"]
+    up = body["shoulderUp"]
+    lo, hi = -math.inf, math.inf
+    for k in range(4):
+        i = limbs[k]
+        hand = k < 2
+        r = (arm if hand else leg) * strain_limit
+        dx = X[i] - x
+        if abs(dx) > r:
+            return None
+        s = math.sqrt(r * r - dx * dx)
+        off = up if hand else 0
+        t = Y[i] - off
+        if t - s > lo:
+            lo = t - s
+        if t + s < hi:
+            hi = t + s
+    if FEET_BELOW_HIPS:
+        fm = Y[i2] if Y[i2] > Y[i3] else Y[i3]
+        if fm > lo:
+            lo = fm
+    if lo > hi:
+        return None
+    feet_y = 0.5 * (Y[i2] + Y[i3])
+    y = min(hi, max(lo, feet_y + body["idealHipAboveFeet"]))
+    strain = 0.0
+    for k in range(4):
+        i = limbs[k]
+        hand = k < 2
+        d = math.hypot(X[i] - x, Y[i] - (y + (up if hand else 0))) / (arm if hand else leg)
+        if d > strain:
+            strain = d
+    return (x, y, strain)
+
+
+def transition_ok(a, b, sb, moved, X, Y, body, limit):
+    """Hips may not jump, and the 3 limbs that stay put must stay in reach halfway."""
+    if math.hypot(a[0] - b[0], a[1] - b[1]) > MAX_HIP_SHIFT * body["height"]:
+        return False
+    mx, my = 0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1])
+    for k in range(4):
+        if k == moved:
+            continue
+        hand = k < 2
+        i = sb[k]
+        d = math.hypot(X[i] - mx, Y[i] - (my + (body["shoulderUp"] if hand else 0)))
+        if d > (body["armReach"] if hand else body["legReach"]) * limit + 1e-6:
+            return False
+    return True
+
+
+class _Heap:
+    """Binary min-heap on node['f'], same sift order as the JS version so ties break the same way."""
+
+    def __init__(self):
+        self.a = []
+
+    def __len__(self):
+        return len(self.a)
+
+    def push(self, n):
+        a = self.a
+        a.append(n)
+        i = len(a) - 1
+        while i > 0:
+            p = (i - 1) >> 1
+            if a[p]["f"] <= a[i]["f"]:
+                break
+            a[p], a[i] = a[i], a[p]
+            i = p
+
+    def pop(self):
+        a = self.a
+        top = a[0]
+        last = a.pop()
+        if a:
+            a[0] = last
+            i = 0
+            n = len(a)
+            while True:
+                l = 2 * i + 1
+                r = l + 1
+                m = i
+                if l < n and a[l]["f"] < a[m]["f"]:
+                    m = l
+                if r < n and a[r]["f"] < a[m]["f"]:
+                    m = r
+                if m == i:
+                    break
+                a[m], a[i] = a[i], a[m]
+                i = m
+        return top
+
+
+def _fail(msg):
+    return {"ok": False, "message": msg, "computeMs": 0, "expansions": 0}
+
+
+def solve(inp):
+    t0 = time.perf_counter()
+    profile = inp["profile"]
+    body = body_from_profile(profile)
+    dynamic_pref = profile.get("style") == "dynamic"
+    strain_limit = 1.15 if dynamic_pref else 1.0
+    max_exp = inp.get("maxExpansions") or 40000
+
+    holds = [dict(h, idx=i) for i, h in enumerate(inp["holds"])]
+    starts = [h for h in holds if h["kind"] == "start"]
+    tops = [h for h in holds if h["kind"] == "top"]
+    if not starts:
+        return _fail("Mark at least one Start hold.")
+    if not tops:
+        return _fail("Mark one Top hold.")
+    start_x = sum(h["x"] for h in starts) / len(starts)
+    ground_y = inp.get("groundY")
+    has_ground = isinstance(ground_y, (int, float)) and not isinstance(ground_y, bool)
+    if has_ground:
+        holds.append({"id": "ground", "x": start_x, "y": ground_y, "kind": "foot", "size": 3,
+                      "idx": len(holds), "floor": True})
+
+    hand_ok = [h["idx"] for h in holds if not h.get("floor") and h["kind"] != "foot"]
+    foot_ok = [h["idx"] for h in holds if h["kind"] != "top" and not h.get("floor")]
+    start_foot_ok = [h["idx"] for h in holds if h["kind"] != "top"]
+    X = [h["x"] for h in holds]
+    Y = [h["y"] for h in holds]
+    size = [h["size"] for h in holds]
+    top_y = max(h["y"] for h in tops)
+    dom = profile.get("dominantHand")
+
+    def is_top(i):
+        return holds[i]["kind"] == "top"
+
+    def hand_cost(limb, hi):
+        size = holds[hi]["size"]
+        if size >= 3:
+            return 0
+        base = 0.6 if size == 1 else 0.25
+        is_dom = (dom == "left" and limb == 0) or (dom == "right" and limb == 1)
+        return base * 0.6 if (is_dom or dom == "either") else base
+
+    def heur(s):
+        hy = max(holds[s[0]]["y"], holds[s[1]]["y"])
+        return math.ceil(max(0, top_y - hy) / (2.4 * body["armReach"]))
+
+    def balance_cost(bp, s):
+        fx = 0.5 * (holds[s[2]]["x"] + holds[s[3]]["x"])
+        off = abs(bp[0] - fx) / (0.25 * body["height"])
+        return 0.8 * off * off
+
+    heap = _Heap()
+    best = {}
+
+    hand_pairs = ([(starts[0]["idx"], starts[0]["idx"])] if len(starts) == 1 else
+                  [(starts[0]["idx"], starts[1]["idx"]), (starts[1]["idx"], starts[0]["idx"])])
+    for lh, rh in hand_pairs:
+        for lf in start_foot_ok:
+            for rf in start_foot_ok:
+                s = (lh, rh, lf, rf)
+                if holds[lf]["y"] > min(holds[lh]["y"], holds[rh]["y"]):
+                    continue
+                bp = place_body(s, X, Y, body, 1.0)
+                if not bp:
+                    continue
+                c = balance_cost(bp, s)
+                if s in best and best[s] <= c:
+                    continue
+                best[s] = c
+                heap.push({"s": s, "g": c, "f": c + heur(s), "parent": None, "move": None, "bp": bp})
+    if not len(heap):
+        return _fail("No feasible starting position: the start holds may be out of reach of any foothold. "
+                     "Add a foot hold or check the calibration.")
+
+    reach_cap = 2.2 * body["armReach"]
+    shift = MAX_HIP_SHIFT * body["height"] + 1e-6
+    hand_cap = body["armReach"] * strain_limit + shift
+    foot_cap = body["legReach"] * strain_limit + shift
+    expansions, goal = 0, None
+    while len(heap) and expansions < max_exp:
+        n = heap.pop()
+        if n["g"] > best[n["s"]] + 1e-9:
+            continue
+        expansions += 1
+        if is_top(n["s"][0]) or is_top(n["s"][1]):
+            goal = n
+            break
+        hip_x, hip_y = n["bp"][0], n["bp"][1]
+        for limb in range(4):
+            cands = hand_ok if limb < 2 else foot_ok
+            cur_i = n["s"][limb]
+            cur = holds[cur_i]
+            for hi in cands:
+                if hi == n["s"][limb]:
+                    continue
+                H = holds[hi]
+                if limb < 2 and hi == n["s"][1 - limb] and H["kind"] not in ("start", "top"):
+                    continue
+                if math.hypot(X[hi] - X[cur_i], Y[hi] - Y[cur_i]) > reach_cap:
+                    continue
+                # Necessary condition (does not change results): the new hip is within MAX_HIP_SHIFT of the
+                # old hip, so a limb that can reach from the new hip is within reach + shift of the old hip.
+                if limb < 2:
+                    if math.hypot(X[hi] - hip_x, Y[hi] - (hip_y + body["shoulderUp"])) > hand_cap:
+                        continue
+                elif math.hypot(X[hi] - hip_x, Y[hi] - hip_y) > foot_cap:
+                    continue
+                s = list(n["s"])
+                s[limb] = hi
+                s = tuple(s)
+                bp = place_body(s, X, Y, body, strain_limit)
+                if not bp:
+                    continue
+                if not transition_ok(n["bp"], bp, s, limb, X, Y, body, strain_limit):
+                    continue
+                strain_term = 0.6 * max(0, bp[2] - 0.6) ** 2 * 6
+                dynamic = bp[2] > 1.0 + 1e-9  # tolerance: hips are clamped to the reach edge, so strain is often 1.0 up to float noise
+                g = (n["g"] + 1 + strain_term + (1.5 if dynamic else 0) + balance_cost(bp, s)
+                     + (hand_cost(limb, hi) if limb < 2 else 0))
+                if s in best and best[s] <= g:
+                    continue
+                best[s] = g
+                heap.push({"s": s, "g": g, "f": g + heur(s), "parent": n,
+                           "move": {"limb": limb, "from": cur["idx"], "to": hi, "dynamic": dynamic}, "bp": bp})
+    ms = (time.perf_counter() - t0) * 1000
+    if goal is None:
+        if expansions >= max_exp:
+            msg = ("Search stopped after %d states without finding a route. "
+                   "Try adding holds, or check calibration." % expansions)
+        else:
+            msg = ("No route found with these holds and this body size. This does not mean the wall is "
+                   "impossible, only that these holds do not link up under the simple reach model.")
+        return {"ok": False, "message": msg, "computeMs": ms, "expansions": expansions}
+
+    chain = []
+    n = goal
+    while n:
+        chain.append(n)
+        n = n["parent"]
+    chain.reverse()
+    moves = []
+    for i, n in enumerate([c for c in chain if c["move"]]):
+        m = n["move"]
+        moves.append({
+            "step": i + 1, "limb": LIMB_NAMES[m["limb"]], "toHold": holds[m["to"]]["id"], "toIdx": m["to"],
+            "to": {"x": holds[m["to"]]["x"], "y": holds[m["to"]]["y"]},
+            "from": {"x": holds[m["from"]]["x"], "y": holds[m["from"]]["y"]},
+            "dynamic": m["dynamic"], "strain": n["bp"][2],
+            "hip": {"x": n["bp"][0], "y": n["bp"][1]},
+            "state": [holds[j]["id"] for j in n["s"]],
+            "prevState": [holds[j]["id"] for j in n["parent"]["s"]],
+            "hipShift": math.hypot(n["bp"][0] - n["parent"]["bp"][0], n["bp"][1] - n["parent"]["bp"][1]),
+        })
+    start = chain[0]
+    by_id = {h["id"]: h for h in holds}
+    bal = max(0, round(100 - 100 * sum(abs(m["hip"]["x"] - 0.5 * (by_id[m["state"][2]]["x"] + by_id[m["state"][3]]["x"]))
+                                       for m in moves) / (len(moves) * 0.25 * body["height"])))
+    return {
+        "ok": True,
+        "start": {"state": [holds[j]["id"] for j in start["s"]], "hip": {"x": start["bp"][0], "y": start["bp"][1]}},
+        "moves": moves,
+        "reachMarginCm": round(min([(1 - m["strain"]) * body["armReach"] for m in moves] + [body["armReach"]])),
+        "maxStrain": max([0] + [m["strain"] for m in moves]),
+        "dynamicMoves": sum(1 for m in moves if m["dynamic"]),
+        "balanceScore": bal,
+        "cost": goal["g"], "expansions": expansions, "computeMs": ms, "body": body,
+        "maxHipShiftCm": round(max([0] + [m["hipShift"] for m in moves])),
+        "groundX": start_x if has_ground else None,
+        "verification": verify_route(X, Y, chain, body, strain_limit),
+    }
+
+
+def verify_route(X, Y, chain, body, limit):
+    issues = []
+    for i, n in enumerate(chain):
+        bp = place_body(n["s"], X, Y, body, limit)
+        if not bp:
+            issues.append("pose %d not reachable" % i)
+        if i > 0:
+            diff = sum(1 for k in range(4) if n["s"][k] != chain[i - 1]["s"][k])
+            if diff != 1:
+                issues.append("step %d changes %d limbs" % (i, diff))
+            if bp and not transition_ok(chain[i - 1]["bp"], bp, n["s"], n["move"]["limb"], X, Y, body, limit):
+                issues.append("step %d transition invalid" % i)
+    return {"ok": not issues, "issues": issues, "checkedPoses": len(chain), "checkedTransitions": len(chain) - 1}
+</script>
+<script id="worker-src" type="text/plain">let py = null;
+self.onmessage = async (e) => {
+  const m = e.data;
+  try {
+    if (m.type === 'init') {
+      const t0 = performance.now();
+      const mod = await import(m.indexURL + 'pyodide.mjs');
+      py = await mod.loadPyodide({ indexURL: m.indexURL });
+      py.runPython(m.src);
+      postMessage({ type: 'ready', ms: performance.now() - t0 });
+    } else if (m.type === 'solve') {
+      py.globals.set('_inp', JSON.stringify(m.input));
+      const out = py.runPython('import json\njson.dumps(solve(json.loads(_inp)))');
+      postMessage({ type: 'result', id: m.id, result: JSON.parse(out) });
+    }
+  } catch (err) { postMessage({ type: 'error', id: m.id, message: String(err && err.message || err) }); }
+};
+</script>
+<script>
+/* Climb Move Helper UI. All in the browser. The solver is Python (physics_solver.py) run through Pyodide in a Web Worker. */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const cv = $('wall'), ctx = cv.getContext('2d'), cv2 = $('wall2'), ctx2 = cv2.getContext('2d');
+  const KIND = { start: '#22c55e', top: '#ef4444', hand: '#38bdf8', foot: '#fbbf24' };
+  const LIMBS = ['LH', 'RH', 'LF', 'RF'];
+  const LIMB_WORD = { LH: 'left hand', RH: 'right hand', LF: 'left foot', RF: 'right foot' };
+  const ORANGE = '#fb923c';
+  // y in cm is measured UP from the bottom edge of the picture. groundY is the floor height on the same axis.
+  const state = { img: null, cmPerPx: null, groundY: null, noGround: false, holds: [], mode: null, calib: [], phase: 'home',
+                  result: null, step: 0, sample: false, animDone: true, animT: 1 };
+  const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const toCm = (v, u) => (u === 'in' ? v * 2.54 : v);
+  const profile = () => ({
+    heightCm: toCm(+$('height').value, $('heightUnit').value),
+    wingspanCm: toCm(+$('span').value, $('spanUnit').value),
+    dominantHand: $('dominant').value,
+    style: $('allowStretch').checked ? 'dynamic' : 'static',
+  });
+  const px2cm = (p) => ({ x: p.x * state.cmPerPx, y: (cv.height - p.y) * state.cmPerPx });
+  const cm2px = (p) => ({ x: p.x / state.cmPerPx, y: cv.height - p.y / state.cmPerPx });
+  const fmtMs = (ms) => (ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s');
+
+  function show(screen) {
+    ['home', 'setup', 'moves'].forEach((s) => { $('s-' + s).hidden = s !== screen; });
+    window.scrollTo(0, 0);
+  }
+  function banner(title, text) { $('banner').innerHTML = ''; const b = document.createElement('b'); b.textContent = title; $('banner').append(b, document.createTextNode(text)); }
+  function busy(text) { if (text) { $('busyText').textContent = text; $('busy').hidden = false; } else $('busy').hidden = true; }
+
+  /* ---------- drawing: shared base ---------- */
+  function drawBase(c, x, dim) {
+    x.clearRect(0, 0, c.width, c.height);
+    if (state.img) x.drawImage(state.img, 0, 0, c.width, c.height);
+    else if (state.sample) {
+      const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, '#44403c'); g.addColorStop(1, '#292524');
+      x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+      x.strokeStyle = '#57534e'; x.lineWidth = 2;
+      for (let y = 0; y <= c.height; y += 150) { x.beginPath(); x.moveTo(0, y); x.lineTo(c.width, y); x.stroke(); }
+      x.beginPath(); x.moveTo(c.width / 2, 0); x.lineTo(c.width / 2, c.height); x.stroke();
+    } else { x.fillStyle = '#0c0a09'; x.fillRect(0, 0, c.width, c.height); }
+    if (dim) { x.fillStyle = 'rgba(0,0,0,' + dim + ')'; x.fillRect(0, 0, c.width, c.height); }
+  }
+  function drawFloor(x, c) {
+    if (!state.cmPerPx || state.groundY === null) return;
+    const y = cm2px({ x: 0, y: state.groundY }).y;
+    x.strokeStyle = '#4ade80'; x.lineWidth = 3; x.setLineDash([10, 7]); x.beginPath(); x.moveTo(0, y); x.lineTo(c.width, y); x.stroke(); x.setLineDash([]);
+    x.fillStyle = '#4ade80'; x.font = 'bold 18px sans-serif'; x.textAlign = 'left'; x.fillText('floor', 8, y - 8);
+  }
+
+  /* ---------- setup screen drawing ---------- */
+  function drawSetup() {
+    drawBase(cv, ctx, 0);
+    ctx.fillStyle = ctx.strokeStyle = '#f472b6'; ctx.lineWidth = 3;
+    state.calib.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, 7); ctx.fill(); });
+    if (state.calib.length === 2) { ctx.beginPath(); ctx.moveTo(state.calib[0].x, state.calib[0].y); ctx.lineTo(state.calib[1].x, state.calib[1].y); ctx.stroke(); }
+    if (!state.cmPerPx) return;
+    drawFloor(ctx, cv);
+    state.holds.forEach((h) => {
+      const p = cm2px(h);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, 7); ctx.fillStyle = KIND[h.kind]; ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; ctx.stroke();
+    });
+  }
+
+  /* ---------- words for places and moves ---------- */
+  function where(p) {
+    const W = cv.width * state.cmPerPx, H = cv.height * state.cmPerPx;
+    const row = p.y / H < 0.34 ? 'low down' : p.y / H < 0.67 ? 'about halfway up' : 'high up';
+    const col = p.x / W < 0.34 ? 'on the left' : p.x / W < 0.67 ? 'in the middle' : 'on the right';
+    return 'the hold ' + row + ', ' + col;
+  }
+  function holdPos(r, id) {
+    if (id === 'ground') return { x: r.groundX, y: state.groundY };
+    const h = state.holds.find((x) => x.id === id); return { x: h.x, y: h.y };
+  }
+  const whereId = (r, id) => (id === 'ground' ? 'the ground' : where(holdPos(r, id)));
+
+  /* ---------- the figure and the move animation ---------- */
+  function poseAt(r, step) { // pose after "step" moves
+    if (step === 0) return { state: r.start.state, hip: r.start.hip };
+    const m = r.moves[step - 1]; return { state: m.state, hip: m.hip };
+  }
+  const NAMES = ['Left hand', 'Right hand', 'Left foot', 'Right foot'];
+  function figure(x, r, hip, ends, movingIdx) {
+    const sh = cm2px({ x: hip.x, y: hip.y + r.body.shoulderUp }), hp = cm2px(hip);
+    const headC = cm2px({ x: hip.x, y: hip.y + r.body.shoulderUp + r.body.height * 0.09 });
+    const headR = Math.max(10, r.body.height * 0.05 / state.cmPerPx);
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    ends.forEach((e, k) => {
+      const t = cm2px(e), from = k < 2 ? sh : hp, mv = k === movingIdx;
+      x.strokeStyle = mv ? ORANGE : 'rgba(255,255,255,.85)'; x.lineWidth = mv ? 9 : 5;
+      x.beginPath(); x.moveTo(from.x, from.y); x.lineTo(t.x, t.y); x.stroke();
+    });
+    x.strokeStyle = '#fff'; x.lineWidth = 11; x.beginPath(); x.moveTo(hp.x, hp.y); x.lineTo(sh.x, sh.y); x.stroke();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(headC.x, headC.y, headR, 0, 7); x.fill();
+    // joints: shoulder and hip
+    [sh, hp].forEach((p) => { x.beginPath(); x.arc(p.x, p.y, 6, 0, 7); x.fillStyle = '#d6d3d1'; x.fill(); });
+    // endpoints: hands are circles, feet are squares
+    ends.forEach((e, k) => {
+      const t = cm2px(e), mv = k === movingIdx, s = mv ? 11 : 9;
+      x.fillStyle = mv ? ORANGE : '#fff'; x.strokeStyle = '#000'; x.lineWidth = 2.5; x.beginPath();
+      if (k < 2) x.arc(t.x, t.y, s, 0, 7); else x.rect(t.x - s, t.y - s, 2 * s, 2 * s);
+      x.fill(); x.stroke();
+    });
+    return { head: { x: headC.x, y: headC.y, r: headR }, ends: ends.map(cm2px) };
+  }
+  // Place word labels next to their anchors without overlapping each other, the figure ends, the head or the target ring.
+  function layoutLabels(x, c, items, obstacles) {
+    const placed = [], out = [];
+    const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+    items.forEach((it) => {
+      x.font = 'bold ' + it.fs + 'px system-ui,sans-serif';
+      const w = x.measureText(it.text).width + 18, h = it.fs + 10;
+      const up = it.pref === 'up', ang = up ? [-90, -50, -130, -10, -170, 30, 150, 90] : [90, 50, 130, 10, 170, -30, -150, -90];
+      let best = null;
+      search: for (const extra of [0, 22, 48, 80]) for (const a of ang) {
+        const rad = a * Math.PI / 180, cx = it.ax + Math.cos(rad) * (w / 2 + (it.gap || 16) + extra), cy = it.ay + Math.sin(rad) * (h / 2 + (it.gap || 16) + extra);
+        const rc = { l: cx - w / 2, r: cx + w / 2, t: cy - h / 2, b: cy + h / 2 };
+        if (rc.l < 4 || rc.r > c.width - 4 || rc.t < 4 || rc.b > c.height - 4) continue;
+        if (placed.some((p) => hit(rc, p)) || obstacles.some((o) => hit(rc, o))) continue;
+        best = rc; break search;
+      }
+      if (!best) { // nothing free nearby: scan the whole picture for the nearest free spot
+        let bd = 1e9;
+        for (let gy = h / 2 + 4; gy <= c.height - h / 2 - 4; gy += 12) for (let gx = w / 2 + 4; gx <= c.width - w / 2 - 4; gx += 12) {
+          const rc = { l: gx - w / 2, r: gx + w / 2, t: gy - h / 2, b: gy + h / 2 };
+          if (placed.some((p) => hit(rc, p)) || obstacles.some((o) => hit(rc, o))) continue;
+          const d = Math.hypot(gx - it.ax, gy - it.ay); if (d < bd) { bd = d; best = rc; }
+        }
+      }
+      if (!best) { const cx = Math.min(Math.max(it.ax, w / 2 + 4), c.width - w / 2 - 4), cy = Math.min(Math.max(it.ay + (up ? -48 : 48), h / 2 + 4), c.height - h / 2 - 4); best = { l: cx - w / 2, r: cx + w / 2, t: cy - h / 2, b: cy + h / 2 }; }
+      placed.push(best); out.push({ it, rc: best });
+    });
+    out.forEach(({ it, rc }) => {
+      const cx = (rc.l + rc.r) / 2, cy = (rc.t + rc.b) / 2;
+      x.strokeStyle = it.moving ? ORANGE : 'rgba(255,255,255,.7)'; x.lineWidth = 2; x.beginPath(); x.moveTo(it.ax, it.ay); x.lineTo(cx, cy); x.stroke();
+      x.fillStyle = it.moving ? ORANGE : '#f5f5f4'; x.beginPath(); x.roundRect ? x.roundRect(rc.l, rc.t, rc.r - rc.l, rc.b - rc.t, 9) : x.rect(rc.l, rc.t, rc.r - rc.l, rc.b - rc.t); x.fill();
+      x.fillStyle = '#1c1917'; x.font = 'bold ' + it.fs + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.fillText(it.text, cx, rc.b - 6);
+    });
+    return out.map(({ it, rc }) => ({ text: it.text, ...rc }));
+  }
+  function drawMoves() {
+    const r = state.result; if (!r || !r.ok) return;
+    drawBase(cv2, ctx2, 0.4); drawFloor(ctx2, cv2);
+    state.holds.forEach((h) => { const p = cm2px(h); ctx2.beginPath(); ctx2.arc(p.x, p.y, h.kind === 'top' ? 11 : 7, 0, 7); ctx2.fillStyle = h.kind === 'top' ? '#ef4444' : 'rgba(255,255,255,.5)'; ctx2.fill();
+      if (h.kind === 'top') { ctx2.fillStyle = '#fecaca'; ctx2.font = 'bold 17px sans-serif'; const right = p.x < cv2.width - 110; ctx2.textAlign = right ? 'left' : 'right'; ctx2.fillText('FINISH', p.x + (right ? 30 : -30), p.y + 6); } });
+    const total = r.moves.length, fin = state.step > total, n = Math.min(state.step, total), e = fin ? 1 : state.animT;
+    const cur = poseAt(r, n); let hip = cur.hip, ends = cur.state.map((id) => holdPos(r, id)), mi = -1, m = null, ring = null;
+    if (n >= 1 && !fin) {
+      m = r.moves[n - 1]; const prev = poseAt(r, n - 1); mi = LIMBS.indexOf(m.limb);
+      hip = { x: prev.hip.x + (cur.hip.x - prev.hip.x) * e, y: prev.hip.y + (cur.hip.y - prev.hip.y) * e };
+      ends = cur.state.map((id, k) => (k === mi ? { x: m.from.x + (m.to.x - m.from.x) * e, y: m.from.y + (m.to.y - m.from.y) * e } : holdPos(r, id)));
+      const a = cm2px(m.from), b = cm2px(m.to); ring = b;
+      ctx2.setLineDash([9, 8]); ctx2.strokeStyle = 'rgba(251,146,60,.9)'; ctx2.lineWidth = 4; ctx2.beginPath(); ctx2.moveTo(a.x, a.y); ctx2.lineTo(b.x, b.y); ctx2.stroke(); ctx2.setLineDash([]);
+      ctx2.beginPath(); ctx2.arc(a.x, a.y, 17, 0, 7); ctx2.strokeStyle = '#a8a29e'; ctx2.lineWidth = 4; ctx2.stroke();
+      ctx2.beginPath(); ctx2.arc(b.x, b.y, 26, 0, 7); ctx2.strokeStyle = ORANGE; ctx2.lineWidth = 6; ctx2.stroke();
+    }
+    const fg = figure(ctx2, r, hip, ends, mi);
+    // labels: target first, then the moving part (while moving), then the other three, so none are hidden or overlapped
+    const box = (p, s) => ({ l: p.x - s, r: p.x + s, t: p.y - s, b: p.y + s });
+    const obstacles = [box({ x: fg.head.x, y: fg.head.y }, fg.head.r + 4)].concat(fg.ends.map((p) => box(p, 16)));
+    if (ring) obstacles.push(box(ring, 30));
+    const st = cur.state, items = [];
+    if (ring) items.push({ text: NAMES[mi] + ' here', ax: ring.x, ay: ring.y, fs: 30, pref: 'up', moving: true, gap: 28 });
+    if (ring && state.animT < 1) items.push({ text: NAMES[mi], ax: fg.ends[mi].x, ay: fg.ends[mi].y, fs: 28, pref: mi < 2 ? 'up' : 'down', moving: true });
+    [0, 1, 2, 3].forEach((k) => {
+      if (k === mi) return;
+      const pair = k < 2 ? 0 : 2, other = k % 2 === 0 ? k + 1 : k - 1;
+      if (st[pair] === st[pair + 1] && other !== mi) { if (k % 2 === 1) return; items.push({ text: pair === 0 ? 'Both hands' : 'Both feet', ax: fg.ends[k].x, ay: fg.ends[k].y, fs: 28, pref: pair === 0 ? 'up' : 'down' }); return; }
+      items.push({ text: NAMES[k], ax: fg.ends[k].x, ay: fg.ends[k].y, fs: 28, pref: k < 2 ? 'up' : 'down' });
+    });
+    state.labels = layoutLabels(ctx2, cv2, items, obstacles);
+    state.labelObstacles = obstacles;
+  }
+  let raf = 0;
+  function playAnim() {
+    cancelAnimationFrame(raf); state.animDone = false;
+    if (reduceMotion() || state.step === 0) { state.animT = 1; state.animDone = true; drawMoves(); return; }
+    const t0 = performance.now(), dur = 1100; state.animT = 0;
+    const tick = (now) => { state.animT = Math.min(1, (now - t0) / dur); drawMoves(); if (state.animT < 1) raf = requestAnimationFrame(tick); else state.animDone = true; };
+    raf = requestAnimationFrame(tick);
+  }
+  function finishAnim() { cancelAnimationFrame(raf); state.animT = 1; state.animDone = true; drawMoves(); }
+
+  /* ---------- moves screen text ---------- */
+  function showStep() {
+    const r = state.result, total = r.moves.length, n = state.step, fin = n > total;
+    $('count').textContent = fin ? 'All done' : n === 0 ? 'Before you start' : 'Move ' + n + ' of ' + total;
+    $('prev').disabled = n === 0; $('next').disabled = fin; $('replay').disabled = n === 0 || fin;
+    $('next').textContent = n === total ? 'Finish \u2192' : n === 0 ? 'Start \u2192' : 'Next \u2192';
+    const warn = $('warnLine'); warn.hidden = true;
+    if (fin) {
+      $('moveTitle').textContent = 'That is the whole suggestion';
+      $('moveSub').textContent = 'It ends with a hand on the finish hold. This is only a guess from a simple model. Use your own judgment.';
+    } else if (n === 0) {
+      $('moveTitle').textContent = 'The suggested start';
+      $('moveSub').textContent = 'The figure shows where the model puts its hands and feet. Tap Start to see the first suggested move.';
+    } else {
+      const m = r.moves[n - 1], w = LIMB_WORD[m.limb];
+      $('moveTitle').textContent = m.toHold === 'ground' ? 'Suggested: ' + w + ' to the ground' : 'Suggested: ' + w + ' to this hold';
+      $('moveSub').textContent = 'Only the orange ' + w + ' moves in this picture. The ring is ' + whereId(r, m.toHold) + '.' + (n === total ? ' This is the last suggested move.' : '');
+      if (m.dynamic) { warn.hidden = false; warn.textContent = 'This one is a long stretch. Be careful with it.'; }
+    }
+    renderDetails();
+    playAnim();
+  }
+  function renderDetails() {
+    const r = state.result, v = r.verification, d = $('details'); d.innerHTML = '';
+    const rows = r.moves.map((m, i) => '<tr class="' + (i + 1 === state.step ? 'cur' : '') + '"><td>' + m.step + '</td><td>' + LIMB_WORD[m.limb] + '</td><td>' + (m.toHold === 'ground' ? 'the ground' : where(holdPos(r, m.toHold)).replace('the hold ', '')) + '</td><td>' + (m.dynamic ? 'long stretch' : 'normal') + '</td></tr>');
+    d.innerHTML = '<div class="stats"><div><span class="hint">Moves</span><b>' + r.moves.length + '</b></div><div><span class="hint">Rough balance score (0 to 100)</span><b>' + r.balanceScore + '</b></div>' +
+      '<div><span class="hint">Time to work it out</span><b>' + fmtMs(r.computeMs) + '</b></div><div><span class="hint">Helper start-up</span><b>' + (r.loadMs ? fmtMs(r.loadMs) : '-') + '</b></div></div>' +
+      '<p class="hint">The route follows the simple rules in "About this project" (' + v.checkedPoses + ' poses re-checked, ' + (v.ok ? 'all passed' : 'SOME FAILED') + '). That does not mean it is possible or safe. It is not the best route, only one that fits the rules.</p>' +
+      '<table class="moves"><tr><th>#</th><th>Move</th><th>To</th><th>Type</th></tr>' + rows.join('') + '</table>';
+  }
+
+  /* ---------- setup flow ---------- */
+  const STEPS = ['Photo', 'Size', 'Floor', 'Holds'];
+  function setPhase(p) {
+    state.phase = p;
+    const idx = { size: 1, floor: 2, holds: 3, ready: 4 }[p]; // steps done before
+    $('stepsBar').innerHTML = STEPS.map((s, i) => '<span class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '"></span>').join('');
+    $('stepsBar').hidden = p === 'ready';
+    $('sizeBox').hidden = !(p === 'size' && state.calib.length === 2);
+    $('floorBox').hidden = p !== 'floor'; $('holdBox').hidden = p !== 'holds';
+    $('solve').hidden = !(p === 'ready' || (p === 'holds' && state.holds.some((h) => h.kind === 'start') && state.holds.some((h) => h.kind === 'top')));
+    if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure or a door.' : 'Now type how long that line is.');
+    else if (p === 'floor') banner('Step 3 of 4: the floor', 'Tap the line where the floor is in your photo.');
+    else if (p === 'holds') banner('Step 4 of 4: mark the holds', state.mode ? 'Pick a kind, then tap each hold in the photo. Mark 2 start holds and 1 finish hold at least.' : 'Pick a kind below, then tap each hold in the photo.');
+    else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves".');
+    drawSetup();
+  }
+  function setMode(m) { state.mode = m; document.querySelectorAll('.kind').forEach((b) => b.classList.toggle('active', b.dataset.mode === m)); if (state.phase === 'holds') setPhase('holds'); }
+  function invalidate() { state.result = null; }
+  const holdsReady = () => { if (state.phase === 'holds') setPhase('holds'); else drawSetup(); };
+  function nextId() { let n = 1; const used = new Set(state.holds.map((h) => h.id)); while (used.has('H' + n)) n++; return 'H' + n; }
+
+  cv.addEventListener('click', (e) => {
+    const rect = cv.getBoundingClientRect();
+    const p = { x: (e.clientX - rect.left) * cv.width / rect.width, y: (e.clientY - rect.top) * cv.height / rect.height };
+    if (state.phase === 'size') { state.calib.push(p); if (state.calib.length > 2) state.calib = [p]; setPhase('size'); return; }
+    if (state.phase === 'floor') { state.groundY = Math.max(0, px2cm(p).y); state.noGround = false; setMode('start'); setPhase('holds'); return; }
+    if (state.phase !== 'holds' || !state.mode) { if (state.phase === 'holds') banner('Step 4 of 4: mark the holds', 'First pick a kind of hold with the buttons below the banner.'); return; }
+    const c = px2cm(p); invalidate();
+    if (state.mode === 'erase') {
+      let best = null, bd = 30 * state.cmPerPx; state.holds.forEach((h) => { const d = Math.hypot(h.x - c.x, h.y - c.y); if (d < bd) { bd = d; best = h; } });
+      if (best) state.holds = state.holds.filter((h) => h !== best);
+    } else {
+      if (state.mode === 'top') state.holds = state.holds.filter((h) => h.kind !== 'top');
+      if (state.mode === 'start' && state.holds.filter((h) => h.kind === 'start').length >= 2) { banner('Too many start holds', 'You can only have 2 start holds. Use "Remove a hold" or "Undo last" first.'); return; }
+      state.holds.push({ id: nextId(), x: c.x, y: c.y, kind: state.mode, size: 2 });
+    }
+    setPhase('holds');
+  });
+  document.querySelectorAll('.kind').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('undo').addEventListener('click', () => { state.holds.pop(); invalidate(); setPhase('holds'); });
+  $('setSize').addEventListener('click', () => {
+    const v = +$('realLen').value, d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
+    if (!(v > 0) || d < 5) { banner('Try again', 'Tap two points that are further apart, then type the real length.'); return; }
+    state.cmPerPx = v / d; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
+  });
+  $('noGround').addEventListener('click', () => { state.groundY = null; state.noGround = true; setMode('start'); setPhase('holds'); });
+
+  $('loadSample').addEventListener('click', () => {
+    state.img = null; state.sample = true; resizeCanvases(600, 900);
+    state.cmPerPx = SAMPLE_WALL.widthCm / 600; state.groundY = 0; state.noGround = false;
+    state.holds = SAMPLE_WALL.holds.map((h) => ({ ...h })); state.calib = []; state.mode = null; invalidate();
+    show('setup'); setPhase('ready');
+  });
+  $('photo').addEventListener('change', (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      state.img = img; state.sample = false; state.cmPerPx = null; state.groundY = null; state.noGround = false; state.holds = []; state.calib = []; state.mode = null; invalidate();
+      resizeCanvases(600, Math.round(600 * img.height / img.width)); show('setup'); setPhase('size');
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  function resizeCanvases(w, h) { cv.width = cv2.width = w; cv.height = cv2.height = h; }
+  $('startOver').addEventListener('click', () => { state.result = null; show('home'); state.phase = 'home'; });
+  $('changeWall').addEventListener('click', () => { state.result = null; cancelAnimationFrame(raf); show('home'); state.phase = 'home'; });
+
+  // The solver is Python (physics_solver.py) running in a Web Worker through Pyodide.
+  const CDN_URL = 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
+  // Prefer a copy served next to the page (./vendor/pyodide/), else fall back to the CDN.
+  async function pyodideUrl() {
+    if (window.PYODIDE_URL) return window.PYODIDE_URL;
+    try { const u = new URL('vendor/pyodide/', location.href).href; const r = await fetch(u + 'pyodide.mjs', { method: 'HEAD' }); if (r.ok) return u; } catch (e) {}
+    if (new URLSearchParams(location.search).get('cdn') === '1') return CDN_URL; // explicit opt-in only
+    throw new Error('Python runtime files not found next to this page (vendor/pyodide/). Add ?cdn=1 to the address to download it from the jsDelivr CDN instead (third-party request).');
+  }
+  let worker = null, workerReady = null, msgId = 1; const waiting = new Map();
+  const timing = { loadMs: null };
+  async function startWorker() {
+    if (workerReady) return workerReady;
+    const code = document.getElementById('worker-src').textContent;
+    const indexURL = await pyodideUrl();
+    worker = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })), { type: 'module' });
+    workerReady = new Promise((resolve, reject) => {
+      worker.onmessage = (e) => {
+        const m = e.data;
+        if (m.type === 'ready') { timing.loadMs = m.ms; resolve(); }
+        else if (m.type === 'result') { waiting.get(m.id)(m.result); waiting.delete(m.id); }
+        else if (m.type === 'error') { reject(new Error(m.message)); if (waiting.has(m.id)) { waiting.get(m.id)({ ok: false, message: 'Python error: ' + m.message, computeMs: 0, expansions: 0 }); waiting.delete(m.id); } }
+      };
+      worker.postMessage({ type: 'init', indexURL, src: document.getElementById('py-src').textContent });
+    });
+    return workerReady;
+  }
+  const pySolve = (input) => new Promise((resolve) => { const id = msgId++; waiting.set(id, resolve); worker.postMessage({ type: 'solve', id, input }); });
+
+  $('solve').addEventListener('click', async () => {
+    const p = profile();
+    if (!(p.heightCm > 100 && p.heightCm < 250 && p.wingspanCm > 100 && p.wingspanCm < 260)) { banner('Check your size', 'Your height and arm span look wrong. Go back with "Start over" and fix them (about 100 to 250 cm).'); return; }
+    if (!state.cmPerPx) { banner('One more thing', 'Set the size first.'); return; }
+    if (state.groundY === null && !state.noGround && !state.sample) { banner('One more thing', 'Tap the floor, or say you cannot see it.'); return; }
+    $('solve').disabled = true;
+    try {
+      busy(timing.loadMs ? 'Working out your moves...' : 'Getting the helper ready. The first time takes a few seconds...');
+      await startWorker();
+      $('busyText').textContent = 'Working out your moves... this can take a few seconds.';
+      const t0 = performance.now();
+      state.result = await pySolve({ profile: p, holds: state.holds, groundY: state.groundY });
+      state.result.wallMs = performance.now() - t0; state.result.loadMs = timing.loadMs;
+      busy(false);
+      if (state.result.ok) { state.step = 0; show('moves'); showStep(); }
+      else { banner('I could not find a way up', 'Try adding more holds, or check the floor and size. (Detail: ' + state.result.message + ')'); }
+    } catch (err) { busy(false); banner('The helper did not start', err.message); workerReady = null; }
+    finally { $('solve').disabled = false; busy(false); }
+  });
+  const go = (n) => { state.step = n; showStep(); };
+  $('prev').addEventListener('click', () => go(Math.max(0, state.step - 1)));
+  $('next').addEventListener('click', () => { const t = state.result.moves.length; if (state.step <= t) go(state.step + 1); });
+  $('replay').addEventListener('click', () => { if (state.step > 0 && state.step <= state.result.moves.length) playAnim(); });
+  ['height', 'heightUnit', 'span', 'spanUnit', 'dominant', 'allowStretch'].forEach((id) => $(id).addEventListener('change', invalidate));
+
+  window.ClimbApp = { state, cm2px, px2cm, finishAnim, setAnimT: (t) => { cancelAnimationFrame(raf); state.animT = t; state.animDone = t >= 1; drawMoves(); } };
+  show('home');
+})();
+
+</script>
 </body>
 </html>

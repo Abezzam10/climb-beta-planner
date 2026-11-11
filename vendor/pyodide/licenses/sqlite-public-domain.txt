@@ -1,0 +1,1 @@
+SQLite is in the public domain and does not require a license. Source: https://sqlite.org/copyright.html (version 3.39.0 per Pyodide build metadata).

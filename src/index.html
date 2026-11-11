@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Climb Move Helper (early test)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="wrap top">
+  <h1>Climb Move Helper</h1>
+  <span class="tag">Early test version</span>
+</header>
+
+<main class="wrap">
+  <!-- SCREEN 1: welcome -->
+  <section id="s-home" class="screen">
+    <p class="big">Pick a wall. I will tell you which hand or foot to move, one move at a time.</p>
+    <div class="card">
+      <h2>About you</h2>
+      <label class="lbl">Your height
+        <div class="row"><input id="height" type="number" inputmode="decimal" step="any" value="175" class="inp"><select id="heightUnit" class="inp sm" aria-label="Height unit"><option>cm</option><option>in</option></select></div>
+      </label>
+      <label class="lbl">Arm span <span class="hint">(arms out wide, fingertip to fingertip)</span>
+        <div class="row"><input id="span" type="number" inputmode="decimal" step="any" value="178" class="inp"><select id="spanUnit" class="inp sm" aria-label="Arm span unit"><option>cm</option><option>in</option></select></div>
+      </label>
+      <details class="more"><summary>More choices</summary>
+        <label class="lbl">Stronger hand
+          <select id="dominant" class="inp"><option value="right">Right</option><option value="left">Left</option><option value="either">Either</option></select>
+        </label>
+        <label class="chk"><input type="checkbox" id="allowStretch"> Allow long stretches (they will be marked)</label>
+      </details>
+    </div>
+    <div class="stack">
+      <button id="loadSample" class="btn big-btn primary">Try the sample wall</button>
+      <label class="btn big-btn pick">Use my own wall photo<input id="photo" type="file" accept="image/*" hidden></label>
+    </div>
+  </section>
+
+  <!-- SCREEN 2: set up the wall -->
+  <section id="s-setup" class="screen" hidden>
+    <div class="steps" id="stepsBar" aria-hidden="true"></div>
+    <div class="banner" id="banner" aria-live="polite"></div>
+    <div id="sizeBox" class="card" hidden>
+      <label class="lbl">How long is the line you tapped?
+        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span><button id="setSize" class="btn primary">Set size</button></div>
+        <span class="hint">100 cm is 1 metre. A tape measure or a door works well.</span>
+      </label>
+    </div>
+    <div id="floorBox" class="stack" hidden>
+      <button id="noGround" class="btn">I can't see the floor in my photo</button>
+    </div>
+    <div id="holdBox" hidden>
+      <div class="kinds" role="group" aria-label="What kind of hold">
+        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (2)</button>
+        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Hand holds</button>
+        <button class="btn kind" data-mode="foot"><i style="background:#fbbf24"></i>Foot holds</button>
+        <button class="btn kind" data-mode="top"><i style="background:#ef4444"></i>Finish (1)</button>
+      </div>
+      <div class="btns">
+        <button id="undo" class="btn">Undo last</button>
+        <button id="erase" class="btn kind" data-mode="erase">Remove a hold</button>
+      </div>
+    </div>
+    <div class="stack"><button id="solve" class="btn big-btn primary" hidden>Find my moves</button></div>
+    <div class="canvas-wrap"><canvas id="wall" width="600" height="900" aria-label="Wall photo"></canvas></div>
+    <div class="stack"><button id="startOver" class="btn">Start over</button></div>
+  </section>
+
+  <!-- SCREEN 3: moves -->
+  <section id="s-moves" class="screen" hidden>
+    <div class="movehead">
+      <div class="count" id="count"></div>
+      <h2 id="moveTitle" class="movetitle" aria-live="polite"></h2>
+      <p id="moveSub" class="movesub"></p>
+    </div>
+    <div class="canvas-wrap"><canvas id="wall2" width="600" height="900" aria-label="Wall with the suggested move"></canvas></div>
+    <p id="warnLine" class="warnline" hidden></p>
+    <div class="navbar">
+      <button id="prev" class="btn nav">&larr; Back</button>
+      <button id="replay" class="btn nav ghost">&#8635; Replay</button>
+      <button id="next" class="btn nav primary">Next &rarr;</button>
+    </div>
+    <p class="safety">Only a guess from a simple flat model. It is not checked for safety and cannot see the wall's angle or the holds. Use your own judgment.</p>
+    <details class="more"><summary>More details</summary>
+      <div id="details"></div>
+    </details>
+    <div class="stack"><button id="changeWall" class="btn">Change wall or my size</button></div>
+  </section>
+
+  <details class="more about"><summary>About this project</summary>
+    <p>An early test that turns a wall photo and a few holds you mark into a suggested order of hand and foot moves, using simple reach and balance rules. It does not say a route is best, safe, or possible. Planned later: automatic hold finding, and offline tests to improve the search on walls it was not tuned on.</p>
+    <ul class="limits">
+      <li>It works in flat 2D. It cannot see wall angle, depth, hold shape, chalk or grip.</li>
+      <li>Reach is a rough guess from your size: arm about 39% of arm span, leg about 50% of height.</li>
+      <li>"Balance" is only how far the hips drift sideways from the feet. It is not a real force calculation.</li>
+      <li>Hold types come from you (or the sample wall). Nothing is found automatically yet.</li>
+      <li>It does not know your strength or grade.</li>
+    </ul>
+  </details>
+</main>
+<footer class="wrap foot">Everything runs in your browser. Your photo is not uploaded anywhere. The first time, a Python helper (about 12 MB) is loaded from this site.</footer>
+
+<div id="busy" class="busy" hidden><div class="spin"></div><p id="busyText">Working...</p></div>
+
+<script src="sampleWall.js"></script>
+<script id="py-src" type="text/plain">/*PYSRC*/</script>
+<script id="worker-src" type="text/plain">/*WORKER*/</script>
+<script src="app.js"></script>
+</body>
+</html>
