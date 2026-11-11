@@ -46,12 +46,15 @@
 
   <!-- SCREEN 2: set up the wall -->
   <section id="s-setup" class="screen" hidden>
+    <div class="topnav"><button type="button" class="btn ghost choose-wall">&larr; Choose another wall</button></div>
     <div class="steps" id="stepsBar" aria-hidden="true"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
+    <details class="more" id="diag" hidden><summary>Show the numbers</summary><p id="diagText" class="hint"></p></details>
     <div id="sizeBox" class="card" hidden>
       <label class="lbl">How long is the line you tapped?
-        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span><button id="setSize" class="btn primary">Set size</button></div>
-        <span class="hint">100 cm is 1 metre. A tape measure or a door works well.</span>
+        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span></div>
+        <span class="hint">100 cm is 1 metre. Best: tap the two ends of something you measured, like a tape measure, or a sheet of A4 paper (29.7 cm long) or US Letter (27.9 cm long) taped flat on the same wall panel as the holds.</span>
+        <div class="btns"><button id="setSize" class="btn primary">Set size: I measured it</button><button id="setSizeGuess" class="btn">Set size: it is a guess</button></div>
       </label>
     </div>
     <div id="floorBox" class="stack" hidden>
@@ -59,9 +62,8 @@
     </div>
     <div id="holdBox" hidden>
       <div class="kinds" role="group" aria-label="What kind of hold">
-        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (2)</button>
-        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Hand holds</button>
-        <button class="btn kind" data-mode="foot"><i style="background:#fbbf24"></i>Foot holds</button>
+        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (1 or 2)</button>
+        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Holds</button>
         <button class="btn kind" data-mode="top"><i style="background:#ef4444"></i>Finish (1)</button>
       </div>
       <div class="btns">
@@ -76,6 +78,7 @@
 
   <!-- SCREEN 3: moves -->
   <section id="s-moves" class="screen" hidden>
+    <div class="topnav"><button type="button" class="btn ghost choose-wall">&larr; Choose another wall</button></div>
     <div class="movehead">
       <div class="count" id="count"></div>
       <h2 id="moveTitle" class="movetitle" aria-live="polite"></h2>
@@ -88,6 +91,7 @@
       <button id="replay" class="btn nav ghost">&#8635; Replay</button>
       <button id="next" class="btn nav primary">Next &rarr;</button>
     </div>
+    <p class="safety" id="scaleNote"></p>
     <p class="safety">Only a guess from a simple flat model. It is not checked for safety and cannot see the wall's angle or the holds. Use your own judgment.</p>
     <details class="more"><summary>More details</summary>
       <div id="details"></div>

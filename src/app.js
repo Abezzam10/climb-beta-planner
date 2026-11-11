@@ -191,6 +191,7 @@
     $('prev').disabled = n === 0; $('next').disabled = fin; $('replay').disabled = n === 0 || fin;
     $('next').textContent = n === total ? 'Finish \u2192' : n === 0 ? 'Start \u2192' : 'Next \u2192';
     const warn = $('warnLine'); warn.hidden = true;
+    $('scaleNote').textContent = state.scaleKind === 'sample' ? 'Size: the sample wall is made up.' : state.scaleKind === 'guess' ? 'Size: you said the length you typed was a guess. Distances are only as good as that guess. This label shows where the size came from, not that it was checked.' : 'Size: you said you measured the length you typed. This label shows where the size came from. The helper does not check it.';
     if (fin) {
       $('moveTitle').textContent = 'That is the whole suggestion';
       $('moveSub').textContent = 'It ends with a hand on the finish hold. This is only a guess from a simple model. Use your own judgment.';
@@ -218,17 +219,17 @@
   /* ---------- setup flow ---------- */
   const STEPS = ['Photo', 'Size', 'Floor', 'Holds'];
   function setPhase(p) {
-    state.phase = p;
+    state.phase = p; $('diag').hidden = true;
     const idx = { size: 1, floor: 2, holds: 3, ready: 4 }[p]; // steps done before
     $('stepsBar').innerHTML = STEPS.map((s, i) => '<span class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '"></span>').join('');
     $('stepsBar').hidden = p === 'ready';
     $('sizeBox').hidden = !(p === 'size' && state.calib.length === 2);
     $('floorBox').hidden = p !== 'floor'; $('holdBox').hidden = p !== 'holds';
     $('solve').hidden = !(p === 'ready' || (p === 'holds' && state.holds.some((h) => h.kind === 'start') && state.holds.some((h) => h.kind === 'top')));
-    if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure or a door.' : 'Now type how long that line is.');
-    else if (p === 'floor') banner('Step 3 of 4: the floor', 'Tap the line where the floor is in your photo.');
-    else if (p === 'holds') banner('Step 4 of 4: mark the holds', state.mode ? 'Pick a kind, then tap each hold in the photo. Mark 2 start holds and 1 finish hold at least.' : 'Pick a kind below, then tap each hold in the photo.');
-    else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves".');
+    if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure, or a sheet of A4 or US Letter paper taped flat on the same wall panel as the holds.' : 'Now type how long that line is.');
+    else if (p === 'floor') banner('Step 3 of 4: the floor', 'With the size you typed (' + (state.scaleKind === 'guess' ? 'a guess' : 'measured') + '), this picture is about ' + (cv.height * state.cmPerPx / 100).toFixed(1) + ' m tall and ' + (cv.width * state.cmPerPx / 100).toFixed(1) + ' m wide. If that looks wrong, tap "Choose another wall" and set the size again. Otherwise tap the line where the floor is in your photo.');
+    else if (p === 'holds') banner('Step 4 of 4: mark the holds', (state.mode ? 'Tap each hold in the photo. ' : 'Pick Start, Holds or Finish below, then tap the holds in the photo. ') + 'Mark 1 or 2 Start holds, 1 Finish hold, and every hold you would use in between. ' + countsText());
+    else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves". To try your own photo, tap "Choose another wall" above.');
     drawSetup();
   }
   function setMode(m) { state.mode = m; document.querySelectorAll('.kind').forEach((b) => b.classList.toggle('active', b.dataset.mode === m)); if (state.phase === 'holds') setPhase('holds'); }
@@ -255,16 +256,18 @@
   });
   document.querySelectorAll('.kind').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('undo').addEventListener('click', () => { state.holds.pop(); invalidate(); setPhase('holds'); });
-  $('setSize').addEventListener('click', () => {
+  function applySize(kind) {
     const v = +$('realLen').value, d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
     if (!(v > 0) || d < 5) { banner('Try again', 'Tap two points that are further apart, then type the real length.'); return; }
-    state.cmPerPx = v / d; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
-  });
+    state.cmPerPx = v / d; state.scaleKind = kind; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
+  }
+  $('setSize').addEventListener('click', () => applySize('measured'));
+  $('setSizeGuess').addEventListener('click', () => applySize('guess'));
   $('noGround').addEventListener('click', () => { state.groundY = null; state.noGround = true; setMode('start'); setPhase('holds'); });
 
   $('loadSample').addEventListener('click', () => {
     state.img = null; state.sample = true; resizeCanvases(600, 900);
-    state.cmPerPx = SAMPLE_WALL.widthCm / 600; state.groundY = 0; state.noGround = false;
+    state.cmPerPx = SAMPLE_WALL.widthCm / 600; state.scaleKind = 'sample'; state.groundY = 0; state.noGround = false;
     state.holds = SAMPLE_WALL.holds.map((h) => ({ ...h })); state.calib = []; state.mode = null; invalidate();
     show('setup'); setPhase('ready');
   });
@@ -278,8 +281,10 @@
     img.src = URL.createObjectURL(f);
   });
   function resizeCanvases(w, h) { cv.width = cv2.width = w; cv.height = cv2.height = h; }
-  $('startOver').addEventListener('click', () => { state.result = null; show('home'); state.phase = 'home'; });
-  $('changeWall').addEventListener('click', () => { state.result = null; cancelAnimationFrame(raf); show('home'); state.phase = 'home'; });
+  function goHome() { state.result = null; cancelAnimationFrame(raf); $('photo').value = ''; show('home'); state.phase = 'home'; window.scrollTo(0, 0); }
+  $('startOver').addEventListener('click', goHome);
+  $('changeWall').addEventListener('click', goHome);
+  document.querySelectorAll('.choose-wall').forEach((b) => b.addEventListener('click', goHome));
 
   // The solver is Python (physics_solver.py) running in a Web Worker through Pyodide.
   const CDN_URL = 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
@@ -310,6 +315,20 @@
   }
   const pySolve = (input) => new Promise((resolve) => { const id = msgId++; waiting.set(id, resolve); worker.postMessage({ type: 'solve', id, input }); });
 
+  const countOf = (k) => state.holds.filter((h) => h.kind === k).length;
+  function countsText() { return 'Marked so far: ' + countOf('start') + ' start, ' + countOf('hand') + ' other holds, ' + countOf('top') + ' finish.'; }
+  function showNoRoute(r) {
+    const between = countOf('hand') + countOf('foot');  // 'foot' only appears in the built-in sample wall
+    const lead = between < 3
+      ? 'The helper only uses holds you tap. It does not find holds in the photo yet. Tap "Holds", then tap the holds you would use between the start and the finish.'
+      : 'These holds do not link up under the simple reach rules. Try marking more holds, especially in the gaps, or check the size you typed.';
+    banner('I could not find a way up', lead + ' ' + countsText());
+    const h = r.hint, m = (cm) => (cm / 100).toFixed(1) + ' m', c = (cm) => Math.round(cm) + ' cm';
+    $('diagText').textContent = (h && h.biggestGapCm != null
+      ? 'Rough numbers, not proof (the body can also move between holds). With the size you typed, your marked holds cover about ' + m(h.wallSpanCm) + ' from lowest to highest. The best chain from start to finish has a longest step of about ' + c(h.biggestGapCm) + ' between two marked holds. Your arm reach is guessed at about ' + c(h.armReachCm) + ' and leg reach about ' + c(h.legReachCm) + '. If the wall is not that tall, the size you typed may be too big. '
+      : '') + 'Solver said: ' + r.message;
+    $('diag').hidden = false;
+  }
   $('solve').addEventListener('click', async () => {
     const p = profile();
     if (!(p.heightCm > 100 && p.heightCm < 250 && p.wingspanCm > 100 && p.wingspanCm < 260)) { banner('Check your size', 'Your height and arm span look wrong. Go back with "Start over" and fix them (about 100 to 250 cm).'); return; }
@@ -325,7 +344,7 @@
       state.result.wallMs = performance.now() - t0; state.result.loadMs = timing.loadMs;
       busy(false);
       if (state.result.ok) { state.step = 0; show('moves'); showStep(); }
-      else { banner('I could not find a way up', 'Try adding more holds, or check the floor and size. (Detail: ' + state.result.message + ')'); }
+      else showNoRoute(state.result);
     } catch (err) { busy(false); banner('The helper did not start', err.message); workerReady = null; }
     finally { $('solve').disabled = false; busy(false); }
   });

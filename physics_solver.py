@@ -134,6 +134,34 @@ def _fail(msg):
     return {"ok": False, "message": msg, "computeMs": 0, "expansions": 0}
 
 
+def _gap_hint(holds, starts, tops, body):
+    """Plain-words facts for a 'no route' result. Does not change the search or any result.
+    The 'biggest gap' is the smallest possible value of the longest step between neighbouring holds
+    when going from a start hold to the top hold through the marked holds (a minimax path)."""
+    pts = [(h["x"], h["y"]) for h in holds if not h.get("floor")]
+    ids = [h["idx"] for h in holds if not h.get("floor")]
+    pos = {i: k for k, i in enumerate(ids)}
+    best = {pos[h["idx"]]: 0.0 for h in starts}
+    done = set()
+    while len(done) < len(pts):
+        cand = [(best[k], k) for k in best if k not in done]
+        if not cand:
+            break
+        d0, k = min(cand)
+        done.add(k)
+        for j in range(len(pts)):
+            if j in done:
+                continue
+            step = math.hypot(pts[k][0] - pts[j][0], pts[k][1] - pts[j][1])
+            nd = max(d0, step)
+            if j not in best or nd < best[j]:
+                best[j] = nd
+    gap = min((best[pos[h["idx"]]] for h in tops if pos[h["idx"]] in best), default=None)
+    ys = [y for _, y in pts]
+    return {"biggestGapCm": gap, "armReachCm": body["armReach"], "legReachCm": body["legReach"],
+            "wallSpanCm": (max(ys) - min(ys)) if ys else 0.0}
+
+
 def solve(inp):
     t0 = time.perf_counter()
     profile = inp["profile"]
@@ -266,7 +294,8 @@ def solve(inp):
         else:
             msg = ("No route found with these holds and this body size. This does not mean the wall is "
                    "impossible, only that these holds do not link up under the simple reach model.")
-        return {"ok": False, "message": msg, "computeMs": ms, "expansions": expansions}
+        return {"ok": False, "message": msg, "computeMs": ms, "expansions": expansions,
+                "hint": _gap_hint(holds, starts, tops, body)}
 
     chain = []
     n = goal

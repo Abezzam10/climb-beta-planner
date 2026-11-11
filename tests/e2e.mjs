@@ -82,10 +82,10 @@ check((await txt('banner')).includes('Step 3 of 4') && await vis('floorBox'), 'f
 await clickImg(400, 1180);
 const gy = await ev('ClimbApp.state.groundY'); check(Math.abs(gy - 5) < 1.5, 'floor tapped at ' + gy.toFixed(1) + ' cm');
 check(await vis('holdBox') && !(await vis('solve')), 'hold buttons shown; Find my moves hidden until start+finish marked');
-for (const k of ['start', 'top', 'hand', 'foot']) { await ev(`document.querySelector('.kind[data-mode="${k}"]').click()`); for (const h of holds.filter((h) => h.kind === k)) await clickImg(4 * h.x, 1200 - 4 * h.y); }
+for (const k of ['start', 'top', 'hand']) { await ev(`document.querySelector('.kind[data-mode="${k}"]').click()`); for (const h of holds.filter((h) => (k === 'hand' ? h.kind === 'hand' || h.kind === 'foot' : h.kind === k))) await clickImg(4 * h.x, 1200 - 4 * h.y); }
 const P = JSON.parse(await ev('JSON.stringify(ClimbApp.state.holds)'));
 check(P.length === 25, 'placed ' + P.length + ' holds by real taps');
-let maxErr = 0; for (const h of holds) { const m = P.filter((p) => p.kind === h.kind).map((p) => Math.hypot(p.x - h.x, p.y - h.y)); maxErr = Math.max(maxErr, Math.min(...m)); }
+let maxErr = 0; for (const h of holds) { const kk = h.kind === 'foot' ? 'hand' : h.kind; const m = P.filter((p) => p.kind === kk).map((p) => Math.hypot(p.x - h.x, p.y - h.y)); maxErr = Math.max(maxErr, Math.min(...m)); }
 check(maxErr < 2.5, 'every placed hold within ' + maxErr.toFixed(2) + ' cm of its true position');
 check(await vis('solve'), 'Find my moves now shown');
 await ev(`window.scrollTo(0,0)`); await shot('3-holds');

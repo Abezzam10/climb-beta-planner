@@ -81,6 +81,7 @@ tr.cur{background:#2e2a27}
 .two p{font-size:.95rem;margin:0}
 .soon{display:inline-block;font-size:.7rem;color:#fde68a;border:1px solid #57534e;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle}
 .back{display:inline-block;margin:6px 0 0;color:#fdba74}
+.topnav{margin:0 0 10px}.topnav .btn{padding:8px 12px;font-size:.9rem}
 </style>
 </head>
 <body>
@@ -123,12 +124,15 @@ tr.cur{background:#2e2a27}
 
   <!-- SCREEN 2: set up the wall -->
   <section id="s-setup" class="screen" hidden>
+    <div class="topnav"><button type="button" class="btn ghost choose-wall">&larr; Choose another wall</button></div>
     <div class="steps" id="stepsBar" aria-hidden="true"></div>
     <div class="banner" id="banner" aria-live="polite"></div>
+    <details class="more" id="diag" hidden><summary>Show the numbers</summary><p id="diagText" class="hint"></p></details>
     <div id="sizeBox" class="card" hidden>
       <label class="lbl">How long is the line you tapped?
-        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span><button id="setSize" class="btn primary">Set size</button></div>
-        <span class="hint">100 cm is 1 metre. A tape measure or a door works well.</span>
+        <div class="row"><input id="realLen" type="number" inputmode="decimal" step="any" value="100" class="inp"><span class="unit">cm</span></div>
+        <span class="hint">100 cm is 1 metre. Best: tap the two ends of something you measured, like a tape measure, or a sheet of A4 paper (29.7 cm long) or US Letter (27.9 cm long) taped flat on the same wall panel as the holds.</span>
+        <div class="btns"><button id="setSize" class="btn primary">Set size: I measured it</button><button id="setSizeGuess" class="btn">Set size: it is a guess</button></div>
       </label>
     </div>
     <div id="floorBox" class="stack" hidden>
@@ -136,9 +140,8 @@ tr.cur{background:#2e2a27}
     </div>
     <div id="holdBox" hidden>
       <div class="kinds" role="group" aria-label="What kind of hold">
-        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (2)</button>
-        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Hand holds</button>
-        <button class="btn kind" data-mode="foot"><i style="background:#fbbf24"></i>Foot holds</button>
+        <button class="btn kind" data-mode="start"><i style="background:#22c55e"></i>Start (1 or 2)</button>
+        <button class="btn kind" data-mode="hand"><i style="background:#38bdf8"></i>Holds</button>
         <button class="btn kind" data-mode="top"><i style="background:#ef4444"></i>Finish (1)</button>
       </div>
       <div class="btns">
@@ -153,6 +156,7 @@ tr.cur{background:#2e2a27}
 
   <!-- SCREEN 3: moves -->
   <section id="s-moves" class="screen" hidden>
+    <div class="topnav"><button type="button" class="btn ghost choose-wall">&larr; Choose another wall</button></div>
     <div class="movehead">
       <div class="count" id="count"></div>
       <h2 id="moveTitle" class="movetitle" aria-live="polite"></h2>
@@ -165,6 +169,7 @@ tr.cur{background:#2e2a27}
       <button id="replay" class="btn nav ghost">&#8635; Replay</button>
       <button id="next" class="btn nav primary">Next &rarr;</button>
     </div>
+    <p class="safety" id="scaleNote"></p>
     <p class="safety">Only a guess from a simple flat model. It is not checked for safety and cannot see the wall's angle or the holds. Use your own judgment.</p>
     <details class="more"><summary>More details</summary>
       <div id="details"></div>
@@ -343,6 +348,34 @@ def _fail(msg):
     return {"ok": False, "message": msg, "computeMs": 0, "expansions": 0}
 
 
+def _gap_hint(holds, starts, tops, body):
+    """Plain-words facts for a 'no route' result. Does not change the search or any result.
+    The 'biggest gap' is the smallest possible value of the longest step between neighbouring holds
+    when going from a start hold to the top hold through the marked holds (a minimax path)."""
+    pts = [(h["x"], h["y"]) for h in holds if not h.get("floor")]
+    ids = [h["idx"] for h in holds if not h.get("floor")]
+    pos = {i: k for k, i in enumerate(ids)}
+    best = {pos[h["idx"]]: 0.0 for h in starts}
+    done = set()
+    while len(done) < len(pts):
+        cand = [(best[k], k) for k in best if k not in done]
+        if not cand:
+            break
+        d0, k = min(cand)
+        done.add(k)
+        for j in range(len(pts)):
+            if j in done:
+                continue
+            step = math.hypot(pts[k][0] - pts[j][0], pts[k][1] - pts[j][1])
+            nd = max(d0, step)
+            if j not in best or nd < best[j]:
+                best[j] = nd
+    gap = min((best[pos[h["idx"]]] for h in tops if pos[h["idx"]] in best), default=None)
+    ys = [y for _, y in pts]
+    return {"biggestGapCm": gap, "armReachCm": body["armReach"], "legReachCm": body["legReach"],
+            "wallSpanCm": (max(ys) - min(ys)) if ys else 0.0}
+
+
 def solve(inp):
     t0 = time.perf_counter()
     profile = inp["profile"]
@@ -475,7 +508,8 @@ def solve(inp):
         else:
             msg = ("No route found with these holds and this body size. This does not mean the wall is "
                    "impossible, only that these holds do not link up under the simple reach model.")
-        return {"ok": False, "message": msg, "computeMs": ms, "expansions": expansions}
+        return {"ok": False, "message": msg, "computeMs": ms, "expansions": expansions,
+                "hint": _gap_hint(holds, starts, tops, body)}
 
     chain = []
     n = goal
@@ -741,6 +775,7 @@ self.onmessage = async (e) => {
     $('prev').disabled = n === 0; $('next').disabled = fin; $('replay').disabled = n === 0 || fin;
     $('next').textContent = n === total ? 'Finish \u2192' : n === 0 ? 'Start \u2192' : 'Next \u2192';
     const warn = $('warnLine'); warn.hidden = true;
+    $('scaleNote').textContent = state.scaleKind === 'sample' ? 'Size: the sample wall is made up.' : state.scaleKind === 'guess' ? 'Size: you said the length you typed was a guess. Distances are only as good as that guess. This label shows where the size came from, not that it was checked.' : 'Size: you said you measured the length you typed. This label shows where the size came from. The helper does not check it.';
     if (fin) {
       $('moveTitle').textContent = 'That is the whole suggestion';
       $('moveSub').textContent = 'It ends with a hand on the finish hold. This is only a guess from a simple model. Use your own judgment.';
@@ -768,17 +803,17 @@ self.onmessage = async (e) => {
   /* ---------- setup flow ---------- */
   const STEPS = ['Photo', 'Size', 'Floor', 'Holds'];
   function setPhase(p) {
-    state.phase = p;
+    state.phase = p; $('diag').hidden = true;
     const idx = { size: 1, floor: 2, holds: 3, ready: 4 }[p]; // steps done before
     $('stepsBar').innerHTML = STEPS.map((s, i) => '<span class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '"></span>').join('');
     $('stepsBar').hidden = p === 'ready';
     $('sizeBox').hidden = !(p === 'size' && state.calib.length === 2);
     $('floorBox').hidden = p !== 'floor'; $('holdBox').hidden = p !== 'holds';
     $('solve').hidden = !(p === 'ready' || (p === 'holds' && state.holds.some((h) => h.kind === 'start') && state.holds.some((h) => h.kind === 'top')));
-    if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure or a door.' : 'Now type how long that line is.');
-    else if (p === 'floor') banner('Step 3 of 4: the floor', 'Tap the line where the floor is in your photo.');
-    else if (p === 'holds') banner('Step 4 of 4: mark the holds', state.mode ? 'Pick a kind, then tap each hold in the photo. Mark 2 start holds and 1 finish hold at least.' : 'Pick a kind below, then tap each hold in the photo.');
-    else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves".');
+    if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure, or a sheet of A4 or US Letter paper taped flat on the same wall panel as the holds.' : 'Now type how long that line is.');
+    else if (p === 'floor') banner('Step 3 of 4: the floor', 'With the size you typed (' + (state.scaleKind === 'guess' ? 'a guess' : 'measured') + '), this picture is about ' + (cv.height * state.cmPerPx / 100).toFixed(1) + ' m tall and ' + (cv.width * state.cmPerPx / 100).toFixed(1) + ' m wide. If that looks wrong, tap "Choose another wall" and set the size again. Otherwise tap the line where the floor is in your photo.');
+    else if (p === 'holds') banner('Step 4 of 4: mark the holds', (state.mode ? 'Tap each hold in the photo. ' : 'Pick Start, Holds or Finish below, then tap the holds in the photo. ') + 'Mark 1 or 2 Start holds, 1 Finish hold, and every hold you would use in between. ' + countsText());
+    else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves". To try your own photo, tap "Choose another wall" above.');
     drawSetup();
   }
   function setMode(m) { state.mode = m; document.querySelectorAll('.kind').forEach((b) => b.classList.toggle('active', b.dataset.mode === m)); if (state.phase === 'holds') setPhase('holds'); }
@@ -805,16 +840,18 @@ self.onmessage = async (e) => {
   });
   document.querySelectorAll('.kind').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('undo').addEventListener('click', () => { state.holds.pop(); invalidate(); setPhase('holds'); });
-  $('setSize').addEventListener('click', () => {
+  function applySize(kind) {
     const v = +$('realLen').value, d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
     if (!(v > 0) || d < 5) { banner('Try again', 'Tap two points that are further apart, then type the real length.'); return; }
-    state.cmPerPx = v / d; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
-  });
+    state.cmPerPx = v / d; state.scaleKind = kind; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
+  }
+  $('setSize').addEventListener('click', () => applySize('measured'));
+  $('setSizeGuess').addEventListener('click', () => applySize('guess'));
   $('noGround').addEventListener('click', () => { state.groundY = null; state.noGround = true; setMode('start'); setPhase('holds'); });
 
   $('loadSample').addEventListener('click', () => {
     state.img = null; state.sample = true; resizeCanvases(600, 900);
-    state.cmPerPx = SAMPLE_WALL.widthCm / 600; state.groundY = 0; state.noGround = false;
+    state.cmPerPx = SAMPLE_WALL.widthCm / 600; state.scaleKind = 'sample'; state.groundY = 0; state.noGround = false;
     state.holds = SAMPLE_WALL.holds.map((h) => ({ ...h })); state.calib = []; state.mode = null; invalidate();
     show('setup'); setPhase('ready');
   });
@@ -828,8 +865,10 @@ self.onmessage = async (e) => {
     img.src = URL.createObjectURL(f);
   });
   function resizeCanvases(w, h) { cv.width = cv2.width = w; cv.height = cv2.height = h; }
-  $('startOver').addEventListener('click', () => { state.result = null; show('home'); state.phase = 'home'; });
-  $('changeWall').addEventListener('click', () => { state.result = null; cancelAnimationFrame(raf); show('home'); state.phase = 'home'; });
+  function goHome() { state.result = null; cancelAnimationFrame(raf); $('photo').value = ''; show('home'); state.phase = 'home'; window.scrollTo(0, 0); }
+  $('startOver').addEventListener('click', goHome);
+  $('changeWall').addEventListener('click', goHome);
+  document.querySelectorAll('.choose-wall').forEach((b) => b.addEventListener('click', goHome));
 
   // The solver is Python (physics_solver.py) running in a Web Worker through Pyodide.
   const CDN_URL = 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
@@ -860,6 +899,20 @@ self.onmessage = async (e) => {
   }
   const pySolve = (input) => new Promise((resolve) => { const id = msgId++; waiting.set(id, resolve); worker.postMessage({ type: 'solve', id, input }); });
 
+  const countOf = (k) => state.holds.filter((h) => h.kind === k).length;
+  function countsText() { return 'Marked so far: ' + countOf('start') + ' start, ' + countOf('hand') + ' other holds, ' + countOf('top') + ' finish.'; }
+  function showNoRoute(r) {
+    const between = countOf('hand') + countOf('foot');  // 'foot' only appears in the built-in sample wall
+    const lead = between < 3
+      ? 'The helper only uses holds you tap. It does not find holds in the photo yet. Tap "Holds", then tap the holds you would use between the start and the finish.'
+      : 'These holds do not link up under the simple reach rules. Try marking more holds, especially in the gaps, or check the size you typed.';
+    banner('I could not find a way up', lead + ' ' + countsText());
+    const h = r.hint, m = (cm) => (cm / 100).toFixed(1) + ' m', c = (cm) => Math.round(cm) + ' cm';
+    $('diagText').textContent = (h && h.biggestGapCm != null
+      ? 'Rough numbers, not proof (the body can also move between holds). With the size you typed, your marked holds cover about ' + m(h.wallSpanCm) + ' from lowest to highest. The best chain from start to finish has a longest step of about ' + c(h.biggestGapCm) + ' between two marked holds. Your arm reach is guessed at about ' + c(h.armReachCm) + ' and leg reach about ' + c(h.legReachCm) + '. If the wall is not that tall, the size you typed may be too big. '
+      : '') + 'Solver said: ' + r.message;
+    $('diag').hidden = false;
+  }
   $('solve').addEventListener('click', async () => {
     const p = profile();
     if (!(p.heightCm > 100 && p.heightCm < 250 && p.wingspanCm > 100 && p.wingspanCm < 260)) { banner('Check your size', 'Your height and arm span look wrong. Go back with "Start over" and fix them (about 100 to 250 cm).'); return; }
@@ -875,7 +928,7 @@ self.onmessage = async (e) => {
       state.result.wallMs = performance.now() - t0; state.result.loadMs = timing.loadMs;
       busy(false);
       if (state.result.ok) { state.step = 0; show('moves'); showStep(); }
-      else { banner('I could not find a way up', 'Try adding more holds, or check the floor and size. (Detail: ' + state.result.message + ')'); }
+      else showNoRoute(state.result);
     } catch (err) { busy(false); banner('The helper did not start', err.message); workerReady = null; }
     finally { $('solve').disabled = false; busy(false); }
   });
