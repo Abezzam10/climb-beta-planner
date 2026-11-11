@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Climb Beta Planner (MVP preview)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="wrap">
+  <h1>Climb Beta Planner</h1>
+  <p class="lead">Suggest a sequence of hand and foot moves up a wall from a photo and your body size. A starting point to try, not a verdict.</p>
+  <div class="badges" id="roadmap">
+    <span class="badge badge-now">Phase 1: Reach and balance heuristic MVP (preview, not yet published)</span>
+    <span class="badge badge-next">Phase 2: Offline solver experiments inspired by Dream-RSI (research idea, not built)</span>
+  </div>
+</header>
+
+<main class="wrap grid">
+  <section class="card" aria-labelledby="profile-h">
+    <h2 id="profile-h">Your climbing profile</h2>
+    <form id="profile" onsubmit="return false">
+      <label class="lbl">Height
+        <div class="row"><input id="height" type="number" step="any" value="175" class="inp"><select id="heightUnit" class="inp sm"><option>cm</option><option>in</option></select></div>
+      </label>
+      <label class="lbl">Wingspan (fingertip to fingertip)
+        <div class="row"><input id="span" type="number" step="any" value="178" class="inp"><select id="spanUnit" class="inp sm"><option>cm</option><option>in</option></select></div>
+      </label>
+      <label class="lbl">Weight <span class="hint">(saved, not used in scoring)</span>
+        <div class="row"><input id="weight" type="number" step="any" value="70" class="inp"><select id="weightUnit" class="inp sm"><option>kg</option><option>lb</option></select></div>
+      </label>
+      <label class="lbl">Stronger hand
+        <select id="dominant" class="inp"><option value="right">Right</option><option value="left">Left</option><option value="either">Either / both</option></select>
+      </label>
+      <label class="lbl">Move style
+        <select id="style" class="inp">
+          <option value="static">Static: stay balanced, avoid big stretches</option>
+          <option value="dynamic">Dynamic: allow longer reaches (flagged)</option>
+        </select>
+      </label>
+    </form>
+    <p class="hint">Height and wingspan set how far each limb can reach in the model. Defaults: 175 cm and 178 cm. Weight is kept for later phases because weight alone does not tell us how hard a move is.</p>
+  </section>
+
+  <section class="card" aria-labelledby="wall-h">
+    <h2 id="wall-h">Wall</h2>
+    <div class="btns">
+      <button id="loadSample" class="btn btn-primary">Load sample wall (25 holds)</button>
+      <label class="btn pick">Upload wall photo<input id="photo" type="file" accept="image/*" hidden></label>
+      <button id="clearHolds" class="btn">Clear holds</button>
+    </div>
+    <div id="tools" class="btns" role="group" aria-label="Marking tool">
+      <button data-mode="calibrate" class="btn tool">1. Calibrate scale</button>
+      <button data-mode="ground" class="btn tool">2. Set ground line</button>
+      <button data-mode="start" class="btn tool">Start hold</button>
+      <button data-mode="hand" class="btn tool">Hand hold</button>
+      <button data-mode="foot" class="btn tool">Foot hold</button>
+      <button data-mode="top" class="btn tool">Top hold</button>
+      <button data-mode="erase" class="btn tool">Erase</button>
+    </div>
+    <label class="hint"><input type="checkbox" id="noGround"> No ground visible in this photo (feet must start on holds I mark)</label>
+    <p id="status" class="status">Load the sample wall or upload a photo to begin.</p>
+    <div class="canvas-wrap"><canvas id="wall" width="600" height="900"></canvas></div>
+    <div class="legend" aria-label="Legend">
+      <span><i style="background:#22c55e"></i>start</span><span><i style="background:#ef4444"></i>top</span><span><i style="background:#38bdf8"></i>hand</span><span><i style="background:#fbbf24"></i>foot</span>
+      <span>Limbs: <b style="color:#38bdf8">LH</b> <b style="color:#a78bfa">RH</b> <b style="color:#fbbf24">LF</b> <b style="color:#fb923c">RF</b></span>
+    </div>
+    <div class="btns stepbar">
+      <button id="solve" class="btn btn-primary">Find a sequence</button>
+      <button id="prev" class="btn" aria-label="Previous step">&larr;</button>
+      <button id="next" class="btn" aria-label="Next step">&rarr;</button>
+      <label>Step <input id="step" type="range" min="0" max="0" value="0"> <span id="stepLabel">0</span></label>
+    </div>
+    <p id="caption" class="caption"></p>
+  </section>
+
+  <section class="card wide" aria-labelledby="out-h">
+    <h2 id="out-h">Suggested sequence</h2>
+    <div id="result" class="muted">No sequence yet.</div>
+  </section>
+
+  <section class="card wide" aria-labelledby="limits-h">
+    <h2 id="limits-h">What this does and does not know</h2>
+    <ul class="limits">
+      <li>It works in flat 2D. It cannot see wall angle, depth, hold shape, chalk, or friction in a photo.</li>
+      <li>"Reach" comes from rough body proportions: arm reach is about 39% of wingspan, leg reach about 50% of height. Real people vary a lot.</li>
+      <li>Each move must keep the hips within 30% of your height of the previous pose, and the three limbs that stay put must still be within reach halfway through. That is a simple 2D check, not real physics.</li>
+      <li>"Balance" is how far the hips drift sideways from the feet. It is not a real torque calculation.</li>
+      <li>"Dynamic" moves are reaches slightly past the static limit. They are flagged, not checked for safety.</li>
+      <li>The ground is only where you set the ground line. If you do not set one, feet must start on marked holds.</li>
+      <li>Hold types and sizes come from you, or from the sample wall. Nothing is detected automatically yet.</li>
+      <li>It does not know your strength or grade, and cannot say a move is possible, safe, or "optimal". Use your own judgment and climb with proper safety practices.</li>
+    </ul>
+  </section>
+
+  <section class="card wide" aria-labelledby="why-h">
+    <h2 id="why-h">About this project</h2>
+    <p class="muted story">An open-source experiment in turning a wall photo and a few marked holds into a suggested order of hand and foot moves, using simple reach and balance rules. It is an early prototype: it says plainly what it is guessing and does not claim a route is best, safe, or possible. Planned later work: automatic hold detection, and offline experiments to improve the search, tested on walls it was not tuned on.</p>
+  </section>
+</main>
+<footer class="wrap foot">Everything runs in your browser and works offline once loaded. Photos are not uploaded anywhere.</footer>
+
+<script src="sampleWall.js"></script>
+<script src="physicsSolver.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
