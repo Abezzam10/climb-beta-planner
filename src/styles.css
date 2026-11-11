@@ -62,3 +62,15 @@ tr.cur{background:#2e2a27}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 @media(min-width:700px){.wrap{max-width:640px}}
+.prose h2{font-size:1.15rem;margin:22px 0 8px}
+.prose p,.prose li{font-size:1rem;margin:0 0 10px}
+.prose ul{padding-left:20px;margin:0 0 12px}
+.prose a,.why a{color:#fdba74}
+.why p{font-size:1rem;margin:0 0 10px}
+.math{background:#0c0a09;border:1px solid #2e2a27;border-radius:12px;padding:12px;font-size:1.05rem;overflow-x:auto;margin:0 0 12px}
+.two{display:grid;gap:10px;margin:0 0 14px}
+.two .card{margin:0}
+.two h3{font-size:.95rem;margin:0 0 6px;color:#fde68a}
+.two p{font-size:.95rem;margin:0}
+.soon{display:inline-block;font-size:.7rem;color:#fde68a;border:1px solid #57534e;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle}
+.back{display:inline-block;margin:6px 0 0;color:#fdba74}

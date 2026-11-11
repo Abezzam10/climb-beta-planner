@@ -10,3 +10,6 @@ h = h.replace('/*PYSRC*/', r(os.path.join(root, 'physics_solver.py')).replace('<
 h = h.replace('/*WORKER*/', r(os.path.join(d, 'solver_worker.js')))
 h = h.replace('<script src="app.js"></script>', '<script>\n' + r(os.path.join(d, 'app.js')) + '\n</script>')
 open(os.path.join(root, 'index.html'), 'w').write(h)
+
+m = r(os.path.join(d, 'motivation.html')).replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + r(os.path.join(d, 'styles.css')) + '</style>')
+open(os.path.join(root, 'motivation.html'), 'w').write(m)

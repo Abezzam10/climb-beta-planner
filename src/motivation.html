@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Motivation and math behind this - Climb Move Helper</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="wrap top">
+  <h1>Climb Move Helper</h1>
+  <span class="tag">Early test version</span>
+</header>
+<main class="wrap prose">
+  <a class="back" href="./">&larr; Back to the helper</a>
+  <h1 style="white-space:normal;font-size:1.5rem;margin:14px 0 6px">Motivation and math behind this</h1>
+  <p>This page explains why I built the helper, what the numbers look like, and what I want to try next. I try to keep "what works today" and "what I only hope to try" clearly apart.</p>
+
+  <h2>Where the idea came from</h2>
+  <p>I found a research paper at work called Dream-RSI. It is about how an AI coding agent explores many different ideas when it is trying to improve a program. A climbing planner has the same kind of problem: there are a huge number of combinations to look through.</p>
+  <p>I thought it might help me one day: let an AI coding agent look for faster rules that skip bad body positions early, so the planner stays quick even when the model of the climber gets richer.</p>
+  <p>This is an idea I want to explore. It is <strong>not built yet</strong>.</p>
+
+  <h2>Why climbing is a good puzzle</h2>
+  <p>Climbing depends on the climber's body. A move that is easy for one person can be hard for another. If you are 6'2 on a cramped V2, you know this well. A good planner should take the climber's size into account.</p>
+  <p>A real human has four limbs that move on their own, a body that has to stay balanced, and forces on every hold. Putting all that in a model makes the number of things to check grow very fast.</p>
+
+  <h2>The math: how fast it grows</h2>
+  <p>Say a wall has 30 holds. Choose a different hold for each of your four limbs: left hand, right hand, left foot and right foot. In how many ways can you hand out the holds?</p>
+  <div class="math">30 &times; 29 &times; 28 &times; 27 = 657,720</div>
+  <p>That is 657,720 ways to give four different holds to the four named limbs. It is not the number of body positions, because the body can still stand differently on the same four holds (for example, hips closer or further from the wall). Each way still needs checks: Can the climber reach? Is the body balanced? Do the limbs cross? And the planner has to look at moves from one way to the next.</p>
+  <p>It grows quickly with more holds. With 60 holds the same count is 60 &times; 59 &times; 58 &times; 57 = 11,703,240.</p>
+  <p>These are raw counts for illustration. They are not the real number of things the helper searches. Letting two hands (or two feet) share a hold adds more combinations, and the hold types and stance rules remove many. The helper has not measured its own search size. The hope is that a planner can skip impossible combinations early, and finding good ways to skip is the hard part.</p>
+
+  <h2>What the helper does today</h2>
+  <ul>
+    <li>It works in flat 2D. It cannot see wall angle, depth, hold shape or grip.</li>
+    <li>Reach is a rough guess from your size.</li>
+    <li>"Balance" is only how far the hips drift sideways from the feet. It is not a real force or torque calculation.</li>
+    <li>It does not model the body in 3D. It does not know your strength or grade.</li>
+    <li>It finds a suggested order of moves. It does not say a route is best, safe or possible.</li>
+    <li>I have not tested how fast it is on phones or on a Mac. I do not claim a speed.</li>
+  </ul>
+
+  <h2>What the Dream-RSI paper says</h2>
+  <p>Paper: <a href="https://arxiv.org/abs/2609.14858">Dream-RSI: Recursive Self-Improvement through Evolving Worlds</a> (arXiv 2609.14858). Project page: <a href="https://www.dream-rsi.com/">dream-rsi.com</a>. Code: <a href="https://github.com/zhengkid/Dream-RSI">github.com/zhengkid/Dream-RSI</a>.</p>
+  <div class="two">
+    <div class="card"><h3>What the paper shows</h3>
+      <p>An AI coding agent searches for better programs. Each search is expensive, because every try is a call to the agent. Dream-RSI saves what happened in earlier searches, then "dreams": it replays that record to test new ways of exploring, without making new calls. The better way of exploring is then used for the next real search.</p></div>
+    <div class="card"><h3>What "162&times;" means</h3>
+      <p>In one task (writing a fast Lasso solver), the paper reports up to 162&times; fewer discovery-agent calls than a method called SimpleTES: 317 calls against 51,200. Against a version of its own system without dreaming, the saving is about 1.7&times;. The number counts agent calls. It is not a speed-up of the final program, and it is not a measure of money or hardware.</p></div>
+    <div class="card"><h3>What the paper does not show</h3>
+      <p>The paper does not study climbing, human body models, torque, or Apple M1 laptops. The agents in it are large cloud models. It does not say this approach is free of compute cost, and it does not say it makes a program run in a browser.</p></div>
+  </div>
+  <p>So I am using Dream-RSI as inspiration for how to explore, not as proof that it will work on climbing.</p>
+
+  <h2>What I want to try next <span class="soon">not built</span></h2>
+  <ul>
+    <li>Let an AI coding agent try to improve the solver's code, for example with rules that skip impossible combinations early. Write down every attempt and every decision it makes.</li>
+    <li>Test each new version of the code on a separate set of walls, with a separate check that its routes are still valid, so the agent cannot win by cheating. The agent never sees those walls.</li>
+    <li>Then study one question: does replaying those written records help pick better ways for the coding agent to explore? This is what Dream-RSI did in its own tasks. It is not known yet if it works here. The solver's own search paths are not the same thing as the agent's attempts, and replaying them cannot show that new, unseen code is correct.</li>
+    <li>Later: a richer body model (3D, forces, limb collisions), only if the simple one shows it is worth it.</li>
+  </ul>
+  <p>If it works, the goal is a planner that stays quick on a phone. That is a goal, not a result.</p>
+
+  <p><a class="back" href="./">&larr; Back to the helper</a></p>
+</main>
+<footer class="wrap foot">Everything runs in your browser. Nothing on this page is a promise of speed or safety.</footer>
+</body>
+</html>
