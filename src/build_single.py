@@ -8,6 +8,7 @@ h = h.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + r(os.pa
 h = h.replace('<script src="sampleWall.js"></script>', '<script>\n' + r(os.path.join(d, 'sampleWall.js')) + '\n</script>')
 h = h.replace('/*PYSRC*/', r(os.path.join(root, 'physics_solver.py')).replace('</script', '<\\/script'))
 h = h.replace('/*WORKER*/', r(os.path.join(d, 'solver_worker.js')))
+h = h.replace('<script src="holdfinder.js"></script>', '<script>\n' + r(os.path.join(d, 'holdfinder.js')) + '\n</script>')
 h = h.replace('<script src="app.js"></script>', '<script>\n' + r(os.path.join(d, 'app.js')) + '\n</script>')
 open(os.path.join(root, 'index.html'), 'w').write(h)
 

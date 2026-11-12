@@ -14,6 +14,8 @@ LIMB_NAMES = ["LH", "RH", "LF", "RF"]
 MAX_HIP_SHIFT = 0.30  # fraction of height
 # Conservative stance rules added after the JS prototype (set both False to match the JS solver exactly):
 FEET_BELOW_HIPS = True  # a pose is rejected if a foot hold is higher than the hips
+ALLOW_HAND_MATCH = True  # both hands may sit on one hold ("matching"). False = the old rule (only on Start or Finish holds). Two feet on one hold were already allowed.
+MATCH_COST = 0.3         # small extra cost for a hand match, so the search does not match when it has no reason to
 NO_CROSSING = True      # a pose is rejected if the left hand is right of the right hand, or the left foot right of the right foot
 
 
@@ -204,9 +206,38 @@ def solve(inp):
         is_dom = (dom == "left" and limb == 0) or (dom == "right" and limb == 1)
         return base * 0.6 if (is_dom or dom == "either") else base
 
+    # Lower bound on the number of moves still needed (every move costs at least 1 and moves one limb at most reach_cap):
+    #  - a hand has to hop through marked holds up to the finish (breadth-first hops, one hand is enough);
+    #  - each foot has to get high enough that a hip within reach of the finish hand can also reach it.
+    # Both are lower bounds on distinct limbs' moves and change by at most 1 per move, so the search stays exact.
+    reach_cap = 2.2 * body["armReach"]
+    n_all = len(holds)
+
+    def hops_from(sources, nodes):
+        dist = {i: 0 for i in sources}
+        frontier = list(sources)
+        while frontier:
+            nxt = []
+            for a in frontier:
+                for b in nodes:
+                    if b not in dist and math.hypot(X[a] - X[b], Y[a] - Y[b]) <= reach_cap:
+                        dist[b] = dist[a] + 1
+                        nxt.append(b)
+            frontier = nxt
+        return dist
+
+    BIG = 10 ** 6
+    hand_hops = hops_from([h["idx"] for h in tops], hand_ok)
+    f_min = min(h["y"] for h in tops) - strain_limit * (body["armReach"] + body["legReach"]) - body["shoulderUp"]
+    foot_nodes = foot_ok + [h["idx"] for h in holds if h.get("floor")]
+    foot_goal = [i for i in foot_nodes if Y[i] >= f_min]
+    foot_hops = hops_from(foot_goal, foot_nodes)
+
     def heur(s):
         hy = max(holds[s[0]]["y"], holds[s[1]]["y"])
-        return math.ceil(max(0, top_y - hy) / (2.4 * body["armReach"]))
+        old = math.ceil(max(0, top_y - hy) / (2.4 * body["armReach"]))
+        hand = min(hand_hops.get(s[0], BIG), hand_hops.get(s[1], BIG))
+        return max(old, hand) + foot_hops.get(s[2], BIG) + foot_hops.get(s[3], BIG)
 
     def balance_cost(bp, s):
         fx = 0.5 * (holds[s[2]]["x"] + holds[s[3]]["x"])
@@ -236,7 +267,6 @@ def solve(inp):
         return _fail("No feasible starting position: the start holds may be out of reach of any foothold. "
                      "Add a foot hold or check the calibration.")
 
-    reach_cap = 2.2 * body["armReach"]
     shift = MAX_HIP_SHIFT * body["height"] + 1e-6
     hand_cap = body["armReach"] * strain_limit + shift
     foot_cap = body["legReach"] * strain_limit + shift
@@ -258,7 +288,8 @@ def solve(inp):
                 if hi == n["s"][limb]:
                     continue
                 H = holds[hi]
-                if limb < 2 and hi == n["s"][1 - limb] and H["kind"] not in ("start", "top"):
+                matching = limb < 2 and hi == n["s"][1 - limb]
+                if matching and not ALLOW_HAND_MATCH and H["kind"] not in ("start", "top"):
                     continue
                 if math.hypot(X[hi] - X[cur_i], Y[hi] - Y[cur_i]) > reach_cap:
                     continue
@@ -280,7 +311,7 @@ def solve(inp):
                 strain_term = 0.6 * max(0, bp[2] - 0.6) ** 2 * 6
                 dynamic = bp[2] > 1.0 + 1e-9  # tolerance: hips are clamped to the reach edge, so strain is often 1.0 up to float noise
                 g = (n["g"] + 1 + strain_term + (1.5 if dynamic else 0) + balance_cost(bp, s)
-                     + (hand_cost(limb, hi) if limb < 2 else 0))
+                     + (hand_cost(limb, hi) if limb < 2 else 0) + (MATCH_COST if matching and H["kind"] not in ("start", "top") else 0))
                 if s in best and best[s] <= g:
                     continue
                 best[s] = g
@@ -290,7 +321,7 @@ def solve(inp):
     if goal is None:
         if expansions >= max_exp:
             msg = ("Search stopped after %d states without finding a route. "
-                   "Try adding holds, or check calibration." % expansions)
+                   "With many holds marked the search can run out of room. Try marking only the holds of the route colour (use the colour buttons), or fewer holds, and check calibration." % expansions)
         else:
             msg = ("No route found with these holds and this body size. This does not mean the wall is "
                    "impossible, only that these holds do not link up under the simple reach model.")
@@ -311,6 +342,7 @@ def solve(inp):
             "to": {"x": holds[m["to"]]["x"], "y": holds[m["to"]]["y"]},
             "from": {"x": holds[m["from"]]["x"], "y": holds[m["from"]]["y"]},
             "dynamic": m["dynamic"], "strain": n["bp"][2],
+            "match": (m["limb"] < 2 and n["s"][0] == n["s"][1]) or (m["limb"] >= 2 and n["s"][2] == n["s"][3]),
             "hip": {"x": n["bp"][0], "y": n["bp"][1]},
             "state": [holds[j]["id"] for j in n["s"]],
             "prevState": [holds[j]["id"] for j in n["parent"]["s"]],

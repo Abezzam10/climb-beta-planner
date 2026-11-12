@@ -70,6 +70,12 @@
         <button id="undo" class="btn">Undo last</button>
         <button id="erase" class="btn kind" data-mode="erase">Remove a hold</button>
       </div>
+      <div id="autoBox" class="autobox" hidden>
+        <button id="autoFind" class="btn">Find holds by colour</button>
+        <div id="chips" class="chips" hidden></div>
+        <p id="autoNote" class="hint" hidden></p>
+        <button id="autoSE" class="btn" hidden>Suggest Start and Finish from the marked holds</button>
+      </div>
     </div>
     <div class="stack"><button id="solve" class="btn big-btn primary" hidden>Find my moves</button></div>
     <div class="canvas-wrap"><canvas id="wall" width="600" height="900" aria-label="Wall photo"></canvas></div>
@@ -117,6 +123,7 @@
 <script src="sampleWall.js"></script>
 <script id="py-src" type="text/plain">/*PYSRC*/</script>
 <script id="worker-src" type="text/plain">/*WORKER*/</script>
+<script src="holdfinder.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

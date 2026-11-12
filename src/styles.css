@@ -75,3 +75,10 @@ tr.cur{background:#2e2a27}
 .soon{display:inline-block;font-size:.7rem;color:#fde68a;border:1px solid #57534e;border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle}
 .back{display:inline-block;margin:6px 0 0;color:#fdba74}
 .topnav{margin:0 0 10px}.topnav .btn{padding:8px 12px;font-size:.9rem}
+
+.autobox{margin:8px 0 0}
+.autobox .btn{margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.chip{min-height:44px;padding:8px 12px;border-radius:999px;border:1px solid #57534e;background:#292524;color:#fafaf9;font:inherit;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.chip i{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #000}
+.chip[aria-pressed=true]{outline:3px solid #fbbf24;background:#3a3532}

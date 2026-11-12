@@ -5,12 +5,15 @@ import json, subprocess, sys, time, os
 root = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, root)
 import physics_solver as P
-P.FEET_BELOW_HIPS = False; P.NO_CROSSING = False  # JS parity is for the old rules
+P.FEET_BELOW_HIPS = False; P.NO_CROSSING = False; P.ALLOW_HAND_MATCH = False  # JS parity is for the old rules
 cases = json.load(open(os.path.join(root, 'tests', 'cases.json')))
 js = json.loads(subprocess.run(['node', os.path.join(root, 'tests', 'dump_js.js')], capture_output=True, text=True, check=True).stdout)
 bad = ties = 0
 for c, j in zip(cases, js):
     t = time.time(); r = P.solve({'profile': c['profile'], 'holds': c['holds'], 'groundY': c['groundY']}); dt = time.time() - t
+    if r['ok'] and not j['ok']:  # old JS hit its search cap; the stronger Python search found a verified route
+        ok = r['verification']['ok']; print('  note: JS stopped at its cap, Python found a verified route')
+        bad += (not ok); print('%-22s %s py %.2fs' % (c['name'], 'OK ' if ok else 'BAD', dt)); continue
     ok = r['ok'] == j['ok'] and (not r['ok'] or abs(r['cost'] - j['cost']) < 1e-6)
     if r['ok']:
         ok = ok and r['verification']['ok']

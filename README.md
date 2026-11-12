@@ -13,14 +13,14 @@ A browser tool that suggests which hand or foot to move next, one move at a time
 - `physics_solver.py` - the solver (standard library only). Source of truth.
 - `src/` - page sources (`index.html`, `app.js`, `styles.css`, `solver_worker.js`, `sampleWall.js`). `python3 src/build_single.py` writes the single `index.html` that is served. Run it after changing any of these or the solver.
 - `vendor/pyodide/` - the Pyodide 314.0.7 core runtime (about 12 MB), served from this site so no CDN is used. Unmodified official release files. Licenses for it and the components inside it are in `vendor/pyodide/licenses/` and mapped in `vendor/pyodide/NOTICE.txt`.
-- `tests/` - `test_parity.py` (needs Node; compares with the first JavaScript prototype in `tests/legacy/`, with the new stance rules switched off), `evaluate.py` (fixed tune and validation walls with an independent route check), `e2e.mjs` (headless Chrome click-through).
+- `tests/` - `test_parity.py` (needs Node; compares with the first JavaScript prototype in `tests/legacy/`, with the new stance rules switched off), `evaluate.py` (fixed tune and validation walls with an independent route check), `e2e.mjs` and `e2e_auto.mjs` (headless Chrome click-through, incl. colour finder), `test_match.py` (two hands on one hold).
 - `RUNBOOK.md` - plan for offline solver experiments. Not built and not run.
 
 ## Run it
 `python3 -m http.server` in this folder, then open http://localhost:8000. It must be served over http (not opened as a file) so the Python runtime can load. The first load takes a few seconds and downloads about 12 MB from the same site.
 
 ## Tests
-`python3 tests/test_parity.py`, `python3 tests/evaluate.py --split both`, `node tests/e2e.mjs http://localhost:8000 /tmp` (Chrome required).
+`python3 tests/test_parity.py`, `python3 tests/test_match.py`, `python3 tests/evaluate.py --split both`, `node tests/e2e.mjs http://localhost:8000 /tmp` (Chrome required).
 
 ## Hosting
 Served by GitHub Pages from the `main` branch root. No build runs on the server.

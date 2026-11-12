@@ -57,6 +57,12 @@
     if (state.calib.length === 2) { ctx.beginPath(); ctx.moveTo(state.calib[0].x, state.calib[0].y); ctx.lineTo(state.calib[1].x, state.calib[1].y); ctx.stroke(); }
     if (!state.cmPerPx) return;
     drawFloor(ctx, cv);
+    (state.cands || []).forEach((cd) => {
+      if (markedAt(cd.x, cd.y)) return;
+      const rr = Math.max(8, cd.r + 3);
+      ctx.beginPath(); ctx.arc(cd.x, cd.y, rr, 0, 7); ctx.lineWidth = 5; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgb(' + cd.rgb.join(',') + ')'; ctx.stroke();
+    });
     state.holds.forEach((h) => {
       const p = cm2px(h);
       ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, 7); ctx.fillStyle = KIND[h.kind]; ctx.fill();
@@ -157,6 +163,8 @@
       ctx2.beginPath(); ctx2.arc(a.x, a.y, 17, 0, 7); ctx2.strokeStyle = '#a8a29e'; ctx2.lineWidth = 4; ctx2.stroke();
       ctx2.beginPath(); ctx2.arc(b.x, b.y, 26, 0, 7); ctx2.strokeStyle = ORANGE; ctx2.lineWidth = 6; ctx2.stroke();
     }
+    // two hands (or two feet) on one hold: draw them side by side so both can be seen
+    [[0, 1], [2, 3]].forEach(([a, b]) => { if (Math.hypot(ends[a].x - ends[b].x, ends[a].y - ends[b].y) < 1e-6) { const dx = 9 * state.cmPerPx; ends[a] = { x: ends[a].x - dx, y: ends[a].y }; ends[b] = { x: ends[b].x + dx, y: ends[b].y }; } });
     const fg = figure(ctx2, r, hip, ends, mi);
     // labels: target first, then the moving part (while moving), then the other three, so none are hidden or overlapped
     const box = (p, s) => ({ l: p.x - s, r: p.x + s, t: p.y - s, b: p.y + s });
@@ -202,6 +210,7 @@
       const m = r.moves[n - 1], w = LIMB_WORD[m.limb];
       $('moveTitle').textContent = m.toHold === 'ground' ? 'Suggested: ' + w + ' to the ground' : 'Suggested: ' + w + ' to this hold';
       $('moveSub').textContent = 'Only the orange ' + w + ' moves in this picture. The ring is ' + whereId(r, m.toHold) + '.' + (n === total ? ' This is the last suggested move.' : '');
+      if (m.match) $('moveSub').textContent += m.limb === 'LH' || m.limb === 'RH' ? ' Both hands are now on this one hold (a match).' : ' Both feet are now on this one hold.';
       if (m.dynamic) { warn.hidden = false; warn.textContent = 'This one is a long stretch. Be careful with it.'; }
     }
     renderDetails();
@@ -225,16 +234,58 @@
     $('stepsBar').hidden = p === 'ready';
     $('sizeBox').hidden = !(p === 'size' && state.calib.length === 2);
     $('floorBox').hidden = p !== 'floor'; $('holdBox').hidden = p !== 'holds';
+    $('autoBox').hidden = !(p === 'holds' && state.img); if (p === 'holds' && state.img) renderChips();
     $('solve').hidden = !(p === 'ready' || (p === 'holds' && state.holds.some((h) => h.kind === 'start') && state.holds.some((h) => h.kind === 'top')));
     if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure, or a sheet of A4 or US Letter paper taped flat on the same wall panel as the holds.' : 'Now type how long that line is.');
     else if (p === 'floor') banner('Step 3 of 4: the floor', 'With the size you typed (' + (state.scaleKind === 'guess' ? 'a guess' : 'measured') + '), this picture is about ' + (cv.height * state.cmPerPx / 100).toFixed(1) + ' m tall and ' + (cv.width * state.cmPerPx / 100).toFixed(1) + ' m wide. If that looks wrong, tap "Choose another wall" and set the size again. Otherwise tap the line where the floor is in your photo.');
-    else if (p === 'holds') banner('Step 4 of 4: mark the holds', (state.mode ? 'Tap each hold in the photo. ' : 'Pick Start, Holds or Finish below, then tap the holds in the photo. ') + 'Mark 1 or 2 Start holds, 1 Finish hold, and every hold you would use in between. ' + countsText());
+    else if (p === 'holds') banner('Step 4 of 4: mark the holds', (state.mode ? 'Tap each hold in the photo. ' : 'Tap "Find holds by colour" to get suggestions, or pick Start, Holds or Finish below and tap the holds in the photo. ') + 'Mark 1 or 2 Start holds, 1 Finish hold, and the holds you would use in between. ' + countsText());
     else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves". To try your own photo, tap "Choose another wall" above.');
     drawSetup();
   }
   function setMode(m) { state.mode = m; document.querySelectorAll('.kind').forEach((b) => b.classList.toggle('active', b.dataset.mode === m)); if (state.phase === 'holds') setPhase('holds'); }
   function invalidate() { state.result = null; }
   const holdsReady = () => { if (state.phase === 'holds') setPhase('holds'); else drawSetup(); };
+  /* ---------- find holds by colour (suggestions only; see holdfinder.js) ---------- */
+  const markedAt = (px, py) => state.holds.some((h) => { const q = cm2px(h); return Math.hypot(q.x - px, q.y - py) < 12; });
+  const holdAt = (px, py) => state.holds.find((h) => { const q = cm2px(h); return Math.hypot(q.x - px, q.y - py) < 12; });
+  function clearCands() { state.cands = null; $('chips').hidden = true; $('chips').innerHTML = ''; $('autoNote').hidden = true; $('autoSE').hidden = true; }
+  function renderChips() {
+    const box = $('chips'), by = {};
+    (state.cands || []).forEach((cd) => { (by[cd.color] = by[cd.color] || []).push(cd); });
+    box.innerHTML = '';
+    Object.keys(by).sort((a, b) => by[b].length - by[a].length).forEach((name) => {
+      const list = by[name], on = list.every((cd) => markedAt(cd.x, cd.y));
+      const avg = [0, 1, 2].map((k) => Math.round(list.reduce((t, cd) => t + cd.rgb[k], 0) / list.length));
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      const i = document.createElement('i'); i.style.background = 'rgb(' + avg.join(',') + ')';
+      b.append(i, document.createTextNode((name === 'white' ? 'white or grey' : name) + ' ' + list.length));
+      b.addEventListener('click', () => {
+        invalidate();
+        if (on) { state.holds = state.holds.filter((h) => !(h.kind === 'hand' && list.some((cd) => { const q = cm2px(h); return Math.hypot(q.x - cd.x, q.y - cd.y) < 12; }))); }
+        else list.forEach((cd) => { if (!markedAt(cd.x, cd.y)) state.holds.push({ id: nextId(), ...px2cm(cd), kind: 'hand', size: 2, auto: true }); });
+        setPhase('holds');
+      });
+      box.append(b);
+    });
+    box.hidden = !Object.keys(by).length;
+    $('autoSE').hidden = !(state.holds.length >= 3 && !state.holds.some((h) => h.kind === 'start') && !state.holds.some((h) => h.kind === 'top'));
+  }
+  $('autoFind').addEventListener('click', () => {
+    const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(state.img, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height), res = HoldFinder.findHolds(d.data, c.width, c.height);
+    state.cands = res.blobs; const n = res.blobs.length;
+    $('autoNote').hidden = false;
+    $('autoNote').textContent = n ? 'I found ' + n + ' spots that stand out from the wall colour. These are only suggestions from colour, not a trained model. I can miss holds close to the wall colour, join holds that touch, and pick up bolts or tape. Tap a colour to use all of it, then fix mistakes: "Remove a hold" deletes one, and tapping a ring (or anywhere) adds one.' : 'I did not find any spots that stand out from the wall colour. Tap the holds yourself.';
+    setPhase('holds');
+  });
+  $('autoSE').addEventListener('click', () => {
+    const hs = state.holds.filter((h) => h.kind === 'hand').sort((a, b) => a.y - b.y);
+    if (hs.length < 3) return; invalidate();
+    hs[hs.length - 1].kind = 'top'; hs[0].kind = 'start'; hs[1].kind = 'start';
+    setPhase('holds');
+    banner('Check the Start and Finish', 'I made the two lowest holds Start and the highest hold Finish. That is a guess. To change one, pick Start, Holds or Finish and tap that hold, or use "Remove a hold". ' + countsText());
+  });
   function nextId() { let n = 1; const used = new Set(state.holds.map((h) => h.id)); while (used.has('H' + n)) n++; return 'H' + n; }
 
   cv.addEventListener('click', (e) => {
@@ -243,7 +294,14 @@
     if (state.phase === 'size') { state.calib.push(p); if (state.calib.length > 2) state.calib = [p]; setPhase('size'); return; }
     if (state.phase === 'floor') { state.groundY = Math.max(0, px2cm(p).y); state.noGround = false; setMode('start'); setPhase('holds'); return; }
     if (state.phase !== 'holds' || !state.mode) { if (state.phase === 'holds') banner('Step 4 of 4: mark the holds', 'First pick a kind of hold with the buttons below the banner.'); return; }
+    if (state.mode !== 'erase' && state.cands) { let bd = 1e9, bc = null; state.cands.forEach((cd) => { const d = Math.hypot(cd.x - p.x, cd.y - p.y); if (d < Math.max(14, cd.r + 8) && d < bd) { bd = d; bc = cd; } }); if (bc) { p.x = bc.x; p.y = bc.y; } }
     const c = px2cm(p); invalidate();
+    const there = state.mode !== 'erase' && holdAt(p.x, p.y);
+    if (there) {  // tapping a hold that is already marked changes its kind instead of adding a second one
+      if (state.mode === 'start' && there.kind !== 'start' && state.holds.filter((h) => h.kind === 'start').length >= 2) { banner('Too many start holds', 'You can only have 2 start holds. Use "Remove a hold" or "Undo last" first.'); return; }
+      if (state.mode === 'top') state.holds.forEach((h) => { if (h.kind === 'top' && h !== there) h.kind = 'hand'; });
+      there.kind = state.mode; setPhase('holds'); return;
+    }
     if (state.mode === 'erase') {
       let best = null, bd = 30 * state.cmPerPx; state.holds.forEach((h) => { const d = Math.hypot(h.x - c.x, h.y - c.y); if (d < bd) { bd = d; best = h; } });
       if (best) state.holds = state.holds.filter((h) => h !== best);
@@ -259,7 +317,7 @@
   function applySize(kind) {
     const v = +$('realLen').value, d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
     if (!(v > 0) || d < 5) { banner('Try again', 'Tap two points that are further apart, then type the real length.'); return; }
-    state.cmPerPx = v / d; state.scaleKind = kind; state.groundY = null; state.holds = []; invalidate(); setPhase('floor');
+    state.cmPerPx = v / d; state.scaleKind = kind; state.groundY = null; state.holds = []; clearCands(); invalidate(); setPhase('floor');
   }
   $('setSize').addEventListener('click', () => applySize('measured'));
   $('setSizeGuess').addEventListener('click', () => applySize('guess'));
@@ -275,13 +333,13 @@
     const f = e.target.files[0]; if (!f) return;
     const img = new Image();
     img.onload = () => {
-      state.img = img; state.sample = false; state.cmPerPx = null; state.groundY = null; state.noGround = false; state.holds = []; state.calib = []; state.mode = null; invalidate();
+      state.img = img; state.sample = false; state.cmPerPx = null; state.groundY = null; state.noGround = false; state.holds = []; clearCands(); state.calib = []; state.mode = null; invalidate();
       resizeCanvases(600, Math.round(600 * img.height / img.width)); show('setup'); setPhase('size');
     };
     img.src = URL.createObjectURL(f);
   });
   function resizeCanvases(w, h) { cv.width = cv2.width = w; cv.height = cv2.height = h; }
-  function goHome() { state.result = null; cancelAnimationFrame(raf); $('photo').value = ''; show('home'); state.phase = 'home'; window.scrollTo(0, 0); }
+  function goHome() { state.result = null; clearCands(); cancelAnimationFrame(raf); $('photo').value = ''; show('home'); state.phase = 'home'; window.scrollTo(0, 0); }
   $('startOver').addEventListener('click', goHome);
   $('changeWall').addEventListener('click', goHome);
   document.querySelectorAll('.choose-wall').forEach((b) => b.addEventListener('click', goHome));
@@ -320,7 +378,7 @@
   function showNoRoute(r) {
     const between = countOf('hand') + countOf('foot');  // 'foot' only appears in the built-in sample wall
     const lead = between < 3
-      ? 'The helper only uses holds you tap. It does not find holds in the photo yet. Tap "Holds", then tap the holds you would use between the start and the finish.'
+      ? 'The helper only uses holds that are marked. Tap "Find holds by colour" or tap the holds you would use between the start and the finish.'
       : 'These holds do not link up under the simple reach rules. Try marking more holds, especially in the gaps, or check the size you typed.';
     banner('I could not find a way up', lead + ' ' + countsText());
     const h = r.hint, m = (cm) => (cm / 100).toFixed(1) + ' m', c = (cm) => Math.round(cm) + ' cm';
