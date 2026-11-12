@@ -11,10 +11,13 @@
                   result: null, step: 0, sample: false, animDone: true, animT: 1 };
   const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const toCm = (v, u) => (u === 'in' ? v * 2.54 : v);
+  const toCm = (v, u) => (u === 'in' ? v * 2.54 : u === 'ft' ? v * 30.48 : v);
+  // show lengths to people in feet and inches; all maths stays in cm
+  const ftIn = (cm) => { const t = Math.round(cm / 2.54); return Math.floor(t / 12) + ' ft ' + (t % 12) + ' in'; };
+  const heightCmNow = () => (+$('heightFt').value || 0) * 30.48 + (+$('heightIn').value || 0) * 2.54;
   const profile = () => ({
-    heightCm: toCm(+$('height').value, $('heightUnit').value),
-    wingspanCm: toCm(+$('span').value, $('spanUnit').value),
+    heightCm: heightCmNow(),
+    wingspanCm: heightCmNow(), // estimate: arm span taken as equal to height
     dominantHand: $('dominant').value,
     style: $('allowStretch').checked ? 'dynamic' : 'static',
   });
@@ -89,20 +92,66 @@
     const m = r.moves[step - 1]; return { state: m.state, hip: m.hip };
   }
   const NAMES = ['Left hand', 'Right hand', 'Left foot', 'Right foot'];
-  function figure(x, r, hip, ends, movingIdx) {
-    const sh = cm2px({ x: hip.x, y: hip.y + r.body.shoulderUp }), hp = cm2px(hip);
-    const headC = cm2px({ x: hip.x, y: hip.y + r.body.shoulderUp + r.body.height * 0.09 });
-    const headR = Math.max(10, r.body.height * 0.05 / state.cmPerPx);
-    x.lineCap = 'round'; x.lineJoin = 'round';
-    ends.forEach((e, k) => {
-      const t = cm2px(e), from = k < 2 ? sh : hp, mv = k === movingIdx;
-      x.strokeStyle = mv ? ORANGE : 'rgba(255,255,255,.85)'; x.lineWidth = mv ? 9 : 5;
-      x.beginPath(); x.moveTo(from.x, from.y); x.lineTo(t.x, t.y); x.stroke();
+  // Two-bone limb: upper + lower segment from "from" to "to" (cm, y up). Returns {joint} when a believable bend exists, {straight:true}
+  // when the target is at full reach, or {bad:true} when no bend fits: too cramped (joint angle under the limit), or the joint would
+  // fall outside the picture. This is drawing only: the solver's reach rules use the straight distance, and bending never makes a hold reachable.
+  // Limits are drawing choices (at least 70 degrees at the elbow and 120 at the knee, so crouches and tight folds are not drawn), not measured joint limits and not a check of the route.
+  function bend(from, to, upper, lower, hand, left) {
+    const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy);
+    if (d >= (upper + lower) * 0.995) return { straight: true };
+    if (d < 1e-6 || d < Math.abs(upper - lower) + 1e-6) return { bad: true };
+    const cosA = (upper * upper + lower * lower - d * d) / (2 * upper * lower);
+    const ang = Math.acos(Math.max(-1, Math.min(1, cosA))) * 180 / Math.PI;
+    if (ang < (hand ? 70 : 120)) return { bad: true };
+    const px = (upper * upper - lower * lower + d * d) / (2 * d), h = Math.sqrt(Math.max(0, upper * upper - px * px));
+    const ux = dx / d, uy = dy / d, nx = -uy, ny = ux, sgn = left ? -1 : 1;
+    const score = (qx, qy) => (hand ? -qy + 0.6 * sgn * qx : sgn * qx + 0.3 * qy);
+    const inside = (q) => { const c = cm2px(q), m = 14; return c.x > m && c.x < cv.width - m && c.y > m && c.y < cv.height - m; };
+    const cands = [1, -1].map((f) => ({ x: from.x + ux * px + f * nx * h, y: from.y + uy * px + f * ny * h }))
+      .filter(inside).sort((p, q) => score(q.x - from.x, q.y - from.y) - score(p.x - from.x, p.y - from.y));
+    return cands.length ? { joint: cands[0] } : { bad: true };
+  }
+  // Limbs for one hip position. A limb that is not moving must reach its hold; the moving limb may stretch (it draws straight).
+  function limbsFor(r, hip, ends, movingIdx) {
+    const shC = { x: hip.x, y: hip.y + r.body.shoulderUp };
+    return ends.map((e, k) => {
+      const reach = k < 2 ? r.body.armReach : r.body.legReach;
+      const up = k < 2 ? reach * 0.482 : reach * 0.5, low = reach - up;
+      const from = k < 2 ? shC : hip;
+      if (k !== movingIdx && Math.hypot(e.x - from.x, e.y - from.y) > reach * 0.995) return { bad: true };
+      return bend(from, e, up, low, k < 2, k % 2 === 0);
     });
+  }
+  function figure(x, r, hip0, ends, movingIdx) {
+    const hip = hip0;  // the solver's own hip, never moved for the drawing
+    const shC = { x: hip.x, y: hip.y + r.body.shoulderUp };
+    const sh = cm2px(shC), hp = cm2px(hip);
+    const H = r.body.height;
+    const headC = cm2px({ x: hip.x, y: hip.y + r.body.shoulderUp + H * 0.115 });
+    const headR = Math.max(8, H * 0.062 / state.cmPerPx);
+    const neckEnd = { x: headC.x, y: headC.y + headR };
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    const joints = [];
+    const limbs = limbsFor(r, hip, ends, movingIdx);
+    // Contacts only (no body) when any limb has no believable bend, or the figure is too small on screen to read.
+    const schematic = limbs.some((l) => l.bad) || H / state.cmPerPx < 110;
+    const segs = [[hp, sh], [sh, neckEnd]];
+    ends.forEach((e, k) => {
+      const t = cm2px(e), from = k < 2 ? sh : hp, mv = k === movingIdx, l = limbs[k];
+      const m = !schematic && l.joint ? cm2px(l.joint) : null;
+      x.strokeStyle = mv ? ORANGE : 'rgba(255,255,255,.85)'; x.lineWidth = mv ? 9 : 5;
+      if (!schematic) { x.beginPath(); x.moveTo(from.x, from.y); if (m) x.lineTo(m.x, m.y); x.lineTo(t.x, t.y); x.stroke(); }
+      if (m) { segs.push([from, m], [m, t]); } else segs.push([from, t]);
+      if (m) joints.push(m);
+    });
+    if (!schematic) {
     x.strokeStyle = '#fff'; x.lineWidth = 11; x.beginPath(); x.moveTo(hp.x, hp.y); x.lineTo(sh.x, sh.y); x.stroke();
+    // neck: a short line from the shoulder up to the bottom of the head, so the head is attached
+    x.strokeStyle = '#fff'; x.lineWidth = 7; x.beginPath(); x.moveTo(sh.x, sh.y); x.lineTo(neckEnd.x, neckEnd.y); x.stroke();
     x.fillStyle = '#fff'; x.beginPath(); x.arc(headC.x, headC.y, headR, 0, 7); x.fill();
     // joints: shoulder and hip
-    [sh, hp].forEach((p) => { x.beginPath(); x.arc(p.x, p.y, 6, 0, 7); x.fillStyle = '#d6d3d1'; x.fill(); });
+    [sh, hp].concat(joints).forEach((p) => { x.beginPath(); x.arc(p.x, p.y, 6, 0, 7); x.fillStyle = '#d6d3d1'; x.fill(); });
+    }
     // endpoints: hands are circles, feet are squares
     ends.forEach((e, k) => {
       const t = cm2px(e), mv = k === movingIdx, s = mv ? 11 : 9;
@@ -110,7 +159,9 @@
       if (k < 2) x.arc(t.x, t.y, s, 0, 7); else x.rect(t.x - s, t.y - s, 2 * s, 2 * s);
       x.fill(); x.stroke();
     });
-    return { head: { x: headC.x, y: headC.y, r: headR }, ends: ends.map(cm2px) };
+    const pts = [];
+    if (!schematic) segs.forEach(([p, q]) => { const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 18)); for (let i = 0; i <= n; i++) pts.push({ x: p.x + (q.x - p.x) * i / n, y: p.y + (q.y - p.y) * i / n }); });
+    return { head: schematic ? { x: -999, y: -999, r: 0 } : { x: headC.x, y: headC.y, r: headR }, ends: ends.map(cm2px), schematic, pts };
   }
   // Place word labels next to their anchors without overlapping each other, the figure ends, the head or the target ring.
   function layoutLabels(x, c, items, obstacles) {
@@ -166,9 +217,10 @@
     // two hands (or two feet) on one hold: draw them side by side so both can be seen
     [[0, 1], [2, 3]].forEach(([a, b]) => { if (Math.hypot(ends[a].x - ends[b].x, ends[a].y - ends[b].y) < 1e-6) { const dx = 9 * state.cmPerPx; ends[a] = { x: ends[a].x - dx, y: ends[a].y }; ends[b] = { x: ends[b].x + dx, y: ends[b].y }; } });
     const fg = figure(ctx2, r, hip, ends, mi);
+    $('figNote').textContent = fg.schematic ? 'No reliable body pose for this step, so no body is drawn. Only the four hold contacts and the move are shown. The hold and move words come from the same simple flat model.' : '';
     // labels: target first, then the moving part (while moving), then the other three, so none are hidden or overlapped
     const box = (p, s) => ({ l: p.x - s, r: p.x + s, t: p.y - s, b: p.y + s });
-    const obstacles = [box({ x: fg.head.x, y: fg.head.y }, fg.head.r + 4)].concat(fg.ends.map((p) => box(p, 16)));
+    const obstacles = [box({ x: fg.head.x, y: fg.head.y }, fg.head.r + 4)].concat(fg.ends.map((p) => box(p, 16))).concat(fg.pts.map((p) => box(p, 9)));
     if (ring) obstacles.push(box(ring, 30));
     const st = cur.state, items = [];
     if (ring) items.push({ text: NAMES[mi] + ' here', ax: ring.x, ay: ring.y, fs: 30, pref: 'up', moving: true, gap: 28 });
@@ -200,9 +252,10 @@
     $('next').textContent = n === total ? 'Finish \u2192' : n === 0 ? 'Start \u2192' : 'Next \u2192';
     const warn = $('warnLine'); warn.hidden = true;
     $('scaleNote').textContent = state.scaleKind === 'sample' ? 'Size: the sample wall is made up.' : state.scaleKind === 'guess' ? 'Size: you said the length you typed was a guess. Distances are only as good as that guess. This label shows where the size came from, not that it was checked.' : 'Size: you said you measured the length you typed. This label shows where the size came from. The helper does not check it.';
+    { const pic = cv.height * (state.cmPerPx || 0), me = profile().heightCm; if (state.scaleKind !== 'sample' && state.cmPerPx && me && pic < me * 1.3) $('scaleNote').textContent += ' Scale check, only a warning and not a test: at this size the whole picture is only about ' + ftIn(pic) + ' tall, close to your own height (' + ftIn(me) + '). That can be right for a low traverse or a cropped photo. If it is not, the length you typed is probably too small, and the figure will look huge and one reach may cover the wall.'; }
     if (fin) {
       $('moveTitle').textContent = 'That is the whole suggestion';
-      $('moveSub').textContent = 'It ends with a hand on the finish hold. This is only a guess from a simple model. Use your own judgment.';
+      $('moveSub').textContent = 'It ends with a hand on the finish hold. This is a flat 2D guess. Reachable here only means the straight distances fit. It does not mean the pose is comfortable, safe or checked. Use your own judgment.';
     } else if (n === 0) {
       $('moveTitle').textContent = 'The suggested start';
       $('moveSub').textContent = 'The figure shows where the model puts its hands and feet. Tap Start to see the first suggested move.';
@@ -237,7 +290,7 @@
     $('autoBox').hidden = !(p === 'holds' && state.img); if (p === 'holds' && state.img) renderChips();
     $('solve').hidden = !(p === 'ready' || (p === 'holds' && state.holds.some((h) => h.kind === 'start') && state.holds.some((h) => h.kind === 'top')));
     if (p === 'size') banner('Step 2 of 4: show the size', state.calib.length < 2 ? 'Tap two ends of something you know the length of, like a tape measure, or a sheet of A4 or US Letter paper taped flat on the same wall panel as the holds.' : 'Now type how long that line is.');
-    else if (p === 'floor') banner('Step 3 of 4: the floor', 'With the size you typed (' + (state.scaleKind === 'guess' ? 'a guess' : 'measured') + '), this picture is about ' + (cv.height * state.cmPerPx / 100).toFixed(1) + ' m tall and ' + (cv.width * state.cmPerPx / 100).toFixed(1) + ' m wide. If that looks wrong, tap "Choose another wall" and set the size again. Otherwise tap the line where the floor is in your photo.');
+    else if (p === 'floor') banner('Step 3 of 4: the floor', 'With the size you typed (' + (state.scaleKind === 'guess' ? 'a guess' : 'measured') + '), this picture is about ' + ftIn(cv.height * state.cmPerPx) + ' tall and ' + ftIn(cv.width * state.cmPerPx) + ' wide. If that looks wrong, tap "Choose another wall" and set the size again. Otherwise tap the line where the floor is in your photo.');
     else if (p === 'holds') banner('Step 4 of 4: mark the holds', (state.mode ? 'Tap each hold in the photo. ' : 'Tap "Find holds by colour" to get suggestions, or pick Start, Holds or Finish below and tap the holds in the photo. ') + 'Mark 1 or 2 Start holds, 1 Finish hold, and the holds you would use in between. ' + countsText());
     else if (p === 'ready') banner('Sample wall', 'This is a made-up wall with 25 holds. Tap "Find my moves". To try your own photo, tap "Choose another wall" above.');
     drawSetup();
@@ -282,9 +335,11 @@
   $('autoSE').addEventListener('click', () => {
     const hs = state.holds.filter((h) => h.kind === 'hand').sort((a, b) => a.y - b.y);
     if (hs.length < 3) return; invalidate();
-    hs[hs.length - 1].kind = 'top'; hs[0].kind = 'start'; hs[1].kind = 'start';
+    hs[hs.length - 1].kind = 'top'; hs[0].kind = 'start';
+    // second Start: the closest hold to the first within about a third of your height above it, so both hands can reach
+    const dist = (h) => Math.hypot(h.x - hs[0].x, h.y - hs[0].y); const lim = hs[0].y + 0.35 * (profile().heightCm || 175); const near = hs.slice(1).filter((h) => h.y <= lim).sort((a, b) => dist(a) - dist(b))[0] || hs[1]; near.kind = 'start';
     setPhase('holds');
-    banner('Check the Start and Finish', 'I made the two lowest holds Start and the highest hold Finish. That is a guess. To change one, pick Start, Holds or Finish and tap that hold, or use "Remove a hold". ' + countsText());
+    banner('Check the Start and Finish', 'I made the lowest hold and a low hold next to it Start and the highest hold Finish. That is a guess. To change one, pick Start, Holds or Finish and tap that hold, or use "Remove a hold". ' + countsText());
   });
   function nextId() { let n = 1; const used = new Set(state.holds.map((h) => h.id)); while (used.has('H' + n)) n++; return 'H' + n; }
 
@@ -315,7 +370,7 @@
   document.querySelectorAll('.kind').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('undo').addEventListener('click', () => { state.holds.pop(); invalidate(); setPhase('holds'); });
   function applySize(kind) {
-    const v = +$('realLen').value, d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
+    const v = toCm(+$('realLen').value, $('realUnit').value), d = state.calib.length === 2 ? Math.hypot(state.calib[0].x - state.calib[1].x, state.calib[0].y - state.calib[1].y) : 0;
     if (!(v > 0) || d < 5) { banner('Try again', 'Tap two points that are further apart, then type the real length.'); return; }
     state.cmPerPx = v / d; state.scaleKind = kind; state.groundY = null; state.holds = []; clearCands(); invalidate(); setPhase('floor');
   }
@@ -381,7 +436,7 @@
       ? 'The helper only uses holds that are marked. Tap "Find holds by colour" or tap the holds you would use between the start and the finish.'
       : 'These holds do not link up under the simple reach rules. Try marking more holds, especially in the gaps, or check the size you typed.';
     banner('I could not find a way up', lead + ' ' + countsText());
-    const h = r.hint, m = (cm) => (cm / 100).toFixed(1) + ' m', c = (cm) => Math.round(cm) + ' cm';
+    const h = r.hint, m = ftIn, c = ftIn;
     $('diagText').textContent = (h && h.biggestGapCm != null
       ? 'Rough numbers, not proof (the body can also move between holds). With the size you typed, your marked holds cover about ' + m(h.wallSpanCm) + ' from lowest to highest. The best chain from start to finish has a longest step of about ' + c(h.biggestGapCm) + ' between two marked holds. Your arm reach is guessed at about ' + c(h.armReachCm) + ' and leg reach about ' + c(h.legReachCm) + '. If the wall is not that tall, the size you typed may be too big. '
       : '') + 'Solver said: ' + r.message;
@@ -389,7 +444,7 @@
   }
   $('solve').addEventListener('click', async () => {
     const p = profile();
-    if (!(p.heightCm > 100 && p.heightCm < 250 && p.wingspanCm > 100 && p.wingspanCm < 260)) { banner('Check your size', 'Your height and arm span look wrong. Go back with "Start over" and fix them (about 100 to 250 cm).'); return; }
+    if (!(p.heightCm > 100 && p.heightCm < 250 && p.wingspanCm > 100 && p.wingspanCm < 260)) { banner('Check your size', 'Your height looks wrong. Go back with "Start over" and fix it (about 3 ft 4 in to 8 ft 2 in).'); return; }
     if (!state.cmPerPx) { banner('One more thing', 'Set the size first.'); return; }
     if (state.groundY === null && !state.noGround && !state.sample) { banner('One more thing', 'Tap the floor, or say you cannot see it.'); return; }
     $('solve').disabled = true;
@@ -410,7 +465,7 @@
   $('prev').addEventListener('click', () => go(Math.max(0, state.step - 1)));
   $('next').addEventListener('click', () => { const t = state.result.moves.length; if (state.step <= t) go(state.step + 1); });
   $('replay').addEventListener('click', () => { if (state.step > 0 && state.step <= state.result.moves.length) playAnim(); });
-  ['height', 'heightUnit', 'span', 'spanUnit', 'dominant', 'allowStretch'].forEach((id) => $(id).addEventListener('change', invalidate));
+  ['heightFt', 'heightIn', 'dominant', 'allowStretch'].forEach((id) => $(id).addEventListener('change', invalidate));
 
   window.ClimbApp = { state, cm2px, px2cm, finishAnim, setAnimT: (t) => { cancelAnimationFrame(raf); state.animT = t; state.animDone = t >= 1; drawMoves(); } };
   show('home');

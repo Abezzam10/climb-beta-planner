@@ -1,5 +1,5 @@
 // Click-through test via Chrome DevTools Protocol. Usage: node tests/e2e.mjs <baseUrl> <outDir>
-const NATIVE_COST = 17.78436262817976;
+const NATIVE_COST = 17.78334688122842; // native Python, 5 ft 9 in with arm span = height (175.26 cm), sample wall
 // Uploads a synthetic 800x1200 "photo", calibrates with a 1 m ruler, sets ground, marks holds by real mouse clicks
 // at phone size, checks coordinate mapping, solves, steps through, and saves screenshots.
 import { spawn } from 'node:child_process';
@@ -76,7 +76,7 @@ async function clickImg(ix, iy) {
 await clickImg(200, 600); await clickImg(600, 600);
 check(await vis('sizeBox'), 'after two taps, the "how long is the line" box appears');
 await shot('2-size');
-await click('setSize');
+await ev("document.getElementById('realUnit').value='cm';document.getElementById('realLen').value='100'"); await click('setSize');
 const cm = await ev('ClimbApp.state.cmPerPx'); check(Math.abs(cm - 1 / 3) < 0.01, 'size set, cmPerPx=' + cm.toFixed(4));
 check((await txt('banner')).includes('Step 3 of 4') && await vis('floorBox'), 'floor step shown');
 await clickImg(400, 1180);
