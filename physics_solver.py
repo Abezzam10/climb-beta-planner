@@ -16,7 +16,20 @@ MAX_HIP_SHIFT = 0.30  # fraction of height
 FEET_BELOW_HIPS = True  # a pose is rejected if a foot hold is higher than the hips
 ALLOW_HAND_MATCH = True  # both hands may sit on one hold ("matching"). False = the old rule (only on Start or Finish holds). Two feet on one hold were already allowed.
 MATCH_COST = 0.3         # small extra cost for a hand match, so the search does not match when it has no reason to
+# Joint limits from normal range of motion (AAOS reference values: elbow flexion 150 deg, knee flexion 135 deg). Interior angle = 180 - flexion.
+# A person is not exactly average and a climber can be more flexible, so this is a stated assumption, not a validated body model.
+MIN_ELBOW_DEG = 30      # smallest interior elbow angle (150 deg of flexion)
+MIN_KNEE_DEG = 45       # smallest interior knee angle (135 deg of flexion)
+ARM_UPPER_FRAC = 0.482  # upper arm share of arm reach (Drillis and Contini: 0.186 / (0.186 + 0.146 + 0.054))
+HIP_X_TRIES = (0.0, 0.06, -0.06, 0.12, -0.12, 0.18, -0.18, 0.25, -0.25)  # hip sideways offsets tried, as a fraction of height, nearest the feet and hands first
 NO_CROSSING = True      # a pose is rejected if the left hand is right of the right hand, or the left foot right of the right foot
+
+
+def _min_reach(reach, upper_frac, min_deg):
+    """Closest a hand or foot can be to its joint when the elbow or knee is bent to min_deg (interior angle).
+    The pure two-link minimum, with no joint limit, would be |upper - lower|."""
+    u, l = reach * upper_frac, reach * (1 - upper_frac)
+    return math.sqrt(max(0.0, u * u + l * l - 2 * u * l * math.cos(math.radians(min_deg))))
 
 
 def body_from_profile(p):
@@ -27,42 +40,89 @@ def body_from_profile(p):
         "legReach": 0.50 * h,
         "shoulderUp": 0.29 * h,
         "idealHipAboveFeet": 0.45 * h,
+        "armMin": _min_reach(0.39 * w, ARM_UPPER_FRAC, MIN_ELBOW_DEG),
+        "legMin": _min_reach(0.50 * h, 0.5, MIN_KNEE_DEG),
     }
 
 
-def place_body(limbs, X, Y, body, strain_limit):
-    """Find a hip position keeping all limbs within reach. Returns (x, y, strain) or None.
-    X and Y are the hold coordinate lists; limbs are 4 hold indices."""
-    i0, i1, i2, i3 = limbs
-    if NO_CROSSING and (X[i0] > X[i1] or X[i2] > X[i3]):
-        return None
-    x = 0.25 * (X[i0] + X[i1]) + 0.25 * (X[i2] + X[i3])
-    arm = body["armReach"]
-    leg = body["legReach"]
-    up = body["shoulderUp"]
+def _place_at_x(limbs, x, X, Y, body, strain_limit):
+    """Hip height for a hip at sideways position x: every limb between its minimum (bent) and maximum (straight) reach.
+    Returns y or None. Chooses the allowed height nearest a standing hip."""
+    arm, leg, up = body["armReach"], body["legReach"], body["shoulderUp"]
+    arm_min, leg_min = body["armMin"], body["legMin"]
     lo, hi = -math.inf, math.inf
+    gaps = []
     for k in range(4):
         i = limbs[k]
         hand = k < 2
         r = (arm if hand else leg) * strain_limit
         dx = X[i] - x
-        if abs(dx) > r:
+        if dx > r or -dx > r:
             return None
         s = math.sqrt(r * r - dx * dx)
-        off = up if hand else 0
-        t = Y[i] - off
+        t = Y[i] - (up if hand else 0)
         if t - s > lo:
             lo = t - s
         if t + s < hi:
             hi = t + s
+        if lo > hi:
+            return None
+        rmin = arm_min if hand else leg_min
+        if -rmin < dx < rmin:
+            g = math.sqrt(rmin * rmin - dx * dx)
+            gaps.append((t - g, t + g))
     if FEET_BELOW_HIPS:
-        fm = Y[i2] if Y[i2] > Y[i3] else Y[i3]
+        fm = Y[limbs[2]] if Y[limbs[2]] > Y[limbs[3]] else Y[limbs[3]]
         if fm > lo:
             lo = fm
-    if lo > hi:
+        if lo > hi:
+            return None
+    ideal = 0.5 * (Y[limbs[2]] + Y[limbs[3]]) + body["idealHipAboveFeet"]
+    if ideal > hi:
+        ideal = hi
+    if ideal < lo:
+        ideal = lo
+    if not gaps:
+        return ideal
+    eps = 1e-7
+    best = None
+    for y in [ideal, lo, hi] + [v for g in gaps for v in g]:
+        if y < lo - eps or y > hi + eps:
+            continue
+        if any(a + eps < y < b - eps for a, b in gaps):
+            continue
+        if best is None or abs(y - ideal) < abs(best - ideal):
+            best = y
+    return best
+
+
+def place_body(limbs, X, Y, body, strain_limit):
+    """Find a hip position where every limb is within reach AND not folded tighter than the elbow and knee limits.
+    Returns (x, y, strain) or None. X and Y are the hold coordinate lists; limbs are 4 hold indices."""
+    i0, i1, i2, i3 = limbs
+    if NO_CROSSING and (X[i0] > X[i1] or X[i2] > X[i3]):
         return None
-    feet_y = 0.5 * (Y[i2] + Y[i3])
-    y = min(hi, max(lo, feet_y + body["idealHipAboveFeet"]))
+    x0 = 0.25 * (X[i0] + X[i1]) + 0.25 * (X[i2] + X[i3])
+    arm, leg, up = body["armReach"], body["legReach"], body["shoulderUp"]
+    # the hip must be within reach sideways of all four holds: skip the sideways positions that cannot work
+    xlo, xhi = -math.inf, math.inf
+    for k in range(4):
+        r = (arm if k < 2 else leg) * strain_limit
+        xlo = max(xlo, X[limbs[k]] - r)
+        xhi = min(xhi, X[limbs[k]] + r)
+    if xlo > xhi:
+        return None
+    x = y = None
+    for f in HIP_X_TRIES:
+        xx = x0 + f * body["height"]
+        if xx < xlo or xx > xhi:
+            continue
+        yy = _place_at_x(limbs, xx, X, Y, body, strain_limit)
+        if yy is not None:
+            x, y = xx, yy
+            break
+    if x is None:
+        return None
     strain = 0.0
     for k in range(4):
         i = limbs[k]
@@ -85,6 +145,8 @@ def transition_ok(a, b, sb, moved, X, Y, body, limit):
         i = sb[k]
         d = math.hypot(X[i] - mx, Y[i] - (my + (body["shoulderUp"] if hand else 0)))
         if d > (body["armReach"] if hand else body["legReach"]) * limit + 1e-6:
+            return False
+        if d < (body["armMin"] if hand else body["legMin"]) - 1e-6:
             return False
     return True
 

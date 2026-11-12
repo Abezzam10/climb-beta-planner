@@ -1,5 +1,5 @@
 // Click-through test via Chrome DevTools Protocol. Usage: node tests/e2e.mjs <baseUrl> <outDir>
-const NATIVE_COST = 17.78334688122842; // native Python, 5 ft 9 in with arm span = height (175.26 cm), sample wall
+const NATIVE_COST = 18.167970584171428; // native Python, 5 ft 9 in with arm span = height (175.26 cm), sample wall
 // Uploads a synthetic 800x1200 "photo", calibrates with a 1 m ruler, sets ground, marks holds by real mouse clicks
 // at phone size, checks coordinate mapping, solves, steps through, and saves screenshots.
 import { spawn } from 'node:child_process';

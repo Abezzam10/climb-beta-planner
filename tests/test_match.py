@@ -3,12 +3,25 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import physics_solver as P
 prof = {'heightCm': 175, 'wingspanCm': 178, 'dominantHand': 'right', 'style': 'static'}
-wall = [('S', 0, 60, 'start'), ('M0', 25, 106, 'hand'), ('M1', -9, 158, 'hand'), ('M2', 21, 198, 'hand'), ('M3', -8, 272, 'hand'), ('T', -22, 344, 'top')]
-holds = [{'id': a, 'x': x, 'y': y, 'kind': k, 'size': 2} for a, x, y, k in wall]
+ORIGINAL = [('S', 0, 60, 'start'), ('M0', 25, 106, 'hand'), ('M1', -9, 158, 'hand'), ('M2', 21, 198, 'hand'), ('M3', -8, 272, 'hand'), ('T', -22, 344, 'top')]
+# Same wall shape moved a few cm. The ORIGINAL needs the elbow bent past 150 degrees of flexion (normal range), so with joint limits
+# on it has no route; see the two checks just below.
+WALL = [('S', 0, 60, 'start'), ('M0', 20, 115, 'hand'), ('M1', -7, 149, 'hand'), ('M2', 18, 201, 'hand'), ('M3', -10, 281, 'hand'), ('T', -24, 338, 'top')]
 fails = 0
 def check(c, m):
     global fails
     print('ok  ' if c else 'FAIL', m); fails += 0 if c else 1
+def mk(w):
+    return [{'id': a, 'x': x, 'y': y, 'kind': k, 'size': 2} for a, x, y, k in w]
+# the original wall: matching logic is unchanged when joint limits are off; with limits on it needs more elbow flexion than normal
+saved = (P.MIN_ELBOW_DEG, P.MIN_KNEE_DEG)
+P.MIN_ELBOW_DEG = 0; P.MIN_KNEE_DEG = 0; P.ALLOW_HAND_MATCH = True
+o = P.solve({'profile': prof, 'holds': mk(ORIGINAL), 'groundY': 0})
+check(o['ok'] and o['verification']['ok'] and any(m['match'] and m['limb'] in ('LH', 'RH') for m in o['moves']), 'original wall, joint limits off: route with a hand match (original test intent)')
+P.MIN_ELBOW_DEG, P.MIN_KNEE_DEG = saved
+o = P.solve({'profile': prof, 'holds': mk(ORIGINAL), 'groundY': 0})
+check(not o['ok'], 'original wall, joint limits on: no route (it needs the elbow folded past normal flexion)')
+holds = mk(WALL)
 P.ALLOW_HAND_MATCH = False
 old = P.solve({'profile': prof, 'holds': holds, 'groundY': 0})
 check(not old['ok'], 'old rule (no hand matching): this wall has no route')

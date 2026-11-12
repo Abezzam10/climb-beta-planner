@@ -6,6 +6,7 @@ root = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, root)
 import physics_solver as P
 P.FEET_BELOW_HIPS = False; P.NO_CROSSING = False; P.ALLOW_HAND_MATCH = False  # JS parity is for the old rules
+P.MIN_ELBOW_DEG = 0; P.MIN_KNEE_DEG = 0; P.HIP_X_TRIES = (0.0,)  # ...and the old body: no minimum bend, hip sideways position fixed
 cases = json.load(open(os.path.join(root, 'tests', 'cases.json')))
 js = json.loads(subprocess.run(['node', os.path.join(root, 'tests', 'dump_js.js')], capture_output=True, text=True, check=True).stdout)
 bad = ties = 0

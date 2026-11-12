@@ -95,20 +95,22 @@
   // Two-bone limb: upper + lower segment from "from" to "to" (cm, y up). Returns {joint} when a believable bend exists, {straight:true}
   // when the target is at full reach, or {bad:true} when no bend fits: too cramped (joint angle under the limit), or the joint would
   // fall outside the picture. This is drawing only: the solver's reach rules use the straight distance, and bending never makes a hold reachable.
-  // Limits are drawing choices (at least 70 degrees at the elbow and 120 at the knee, so crouches and tight folds are not drawn), not measured joint limits and not a check of the route.
+  // Limits are drawing choices (the solver keeps the elbow at 30 degrees or more and the knee at 45 or more at each pose; the drawing allows a little less while a limb is moving), not measured joint limits and not a check of the route.
   function bend(from, to, upper, lower, hand, left) {
     const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy);
     if (d >= (upper + lower) * 0.995) return { straight: true };
     if (d < 1e-6 || d < Math.abs(upper - lower) + 1e-6) return { bad: true };
     const cosA = (upper * upper + lower * lower - d * d) / (2 * upper * lower);
     const ang = Math.acos(Math.max(-1, Math.min(1, cosA))) * 180 / Math.PI;
-    if (ang < (hand ? 70 : 120)) return { bad: true };
+    if (ang < (hand ? 22 : 35)) return { bad: true, why: 'angle ' + ang.toFixed(1) + ' d/R ' + (d / (upper + lower)).toFixed(2) };
     const px = (upper * upper - lower * lower + d * d) / (2 * d), h = Math.sqrt(Math.max(0, upper * upper - px * px));
     const ux = dx / d, uy = dy / d, nx = -uy, ny = ux, sgn = left ? -1 : 1;
     const score = (qx, qy) => (hand ? -qy + 0.6 * sgn * qx : sgn * qx + 0.3 * qy);
     const inside = (q) => { const c = cm2px(q), m = 14; return c.x > m && c.x < cv.width - m && c.y > m && c.y < cv.height - m; };
-    const cands = [1, -1].map((f) => ({ x: from.x + ux * px + f * nx * h, y: from.y + uy * px + f * ny * h }))
-      .filter(inside).sort((p, q) => score(q.x - from.x, q.y - from.y) - score(p.x - from.x, p.y - from.y));
+    // prefer a joint that is inside the picture; if both bends fall outside it (a hold near the picture edge) draw the better one anyway, cut by the edge
+    const all = [1, -1].map((f) => ({ x: from.x + ux * px + f * nx * h, y: from.y + uy * px + f * ny * h }));
+    const ins = all.filter(inside);
+    const cands = (ins.length ? ins : all).sort((p, q) => score(q.x - from.x, q.y - from.y) - score(p.x - from.x, p.y - from.y));
     return cands.length ? { joint: cands[0] } : { bad: true };
   }
   // Limbs for one hip position. A limb that is not moving must reach its hold; the moving limb may stretch (it draws straight).
@@ -118,7 +120,7 @@
       const reach = k < 2 ? r.body.armReach : r.body.legReach;
       const up = k < 2 ? reach * 0.482 : reach * 0.5, low = reach - up;
       const from = k < 2 ? shC : hip;
-      if (k !== movingIdx && Math.hypot(e.x - from.x, e.y - from.y) > reach * 0.995) return { bad: true };
+      if (k !== movingIdx && Math.hypot(e.x - from.x, e.y - from.y) > reach * 1.16) return { bad: true };
       return bend(from, e, up, low, k < 2, k % 2 === 0);
     });
   }
@@ -134,7 +136,7 @@
     const joints = [];
     const limbs = limbsFor(r, hip, ends, movingIdx);
     // Contacts only (no body) when any limb has no believable bend, or the figure is too small on screen to read.
-    const schematic = limbs.some((l) => l.bad) || H / state.cmPerPx < 110;
+    const schematic = limbs.some((l) => l.bad);
     const segs = [[hp, sh], [sh, neckEnd]];
     ends.forEach((e, k) => {
       const t = cm2px(e), from = k < 2 ? sh : hp, mv = k === movingIdx, l = limbs[k];
